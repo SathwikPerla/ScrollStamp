@@ -3,48 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ScrollStamp</title>
+  <title>ScrollStamp v2</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="popup-container">
-    <!-- Header -->
-    <div class="popup-header">
-      <span class="popup-icon">📌</span>
-      <span class="popup-title">ScrollStamp</span>
-    </div>
-
-    <!-- Page Info -->
-    <div class="page-info">
-      <div class="page-title" id="pageTitle">Loading...</div>
-      <div class="stamp-count" id="stampCount">0 stamps</div>
-    </div>
-
-    <!-- Stamps List -->
-    <div class="stamps-section">
-      <div class="stamps-header">Saved Stamps</div>
-      <div class="stamps-list" id="stampsList">
-        <!-- Stamps will be inserted here -->
+    <header class="popup-header">
+      <h1>📌 ScrollStamp</h1>
+      <span class="version">v2.0</span>
+    </header>
+    
+    <div id="stamps-container">
+      <div id="empty-state" class="empty-state">
+        <p>No bookmarks yet</p>
+        <span>Click 📌 on any AI chat to bookmark messages</span>
       </div>
+      <ul id="stamps-list"></ul>
     </div>
-
-    <!-- Actions -->
-    <div class="popup-actions">
-      <button class="btn btn-secondary" id="viewStampsBtn">
-        <span>👁️</span> View on Page
+    
+    <footer class="popup-footer">
+      <button id="clear-all" class="btn-clear" title="Clear all bookmarks">
+        🗑️ Clear All
       </button>
-      <button class="btn btn-danger" id="clearStampsBtn">
-        <span>🗑️</span> Clear All
-      </button>
-    </div>
-
-    <!-- Footer -->
-    <div class="popup-footer">
-      <span>💡 Tip: Double-click 📌 to see stamps panel</span>
-    </div>
+    </footer>
   </div>
-
   <script src="popup.js"></script>
 </body>
 </html>
-

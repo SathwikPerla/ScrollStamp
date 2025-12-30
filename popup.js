@@ -1,163 +1,157 @@
-(function () {
-  "use strict";
+// ScrollStamp v2 - Popup Script
 
-  var pageTitle = document.getElementById("pageTitle");
-  var stampCount = document.getElementById("stampCount");
-  var stampsList = document.getElementById("stampsList");
-  var viewStampsBtn = document.getElementById("viewStampsBtn");
-  var clearStampsBtn = document.getElementById("clearStampsBtn");
+document.addEventListener("DOMContentLoaded", init);
 
-  var currentUrl = "";
-  var currentStamps = [];
+function init() {
+  loadStamps();
 
-  // Get active tab and load stamps
-  function init() {
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-      if (tabs[0]) {
-        var tab = tabs[0];
-        currentUrl = tab.url.split("#")[0];
-        pageTitle.textContent = tab.title || "Unknown Page";
+  document
+    .getElementById("clear-all")
+    .addEventListener("click", clearAllStamps);
+}
 
-        loadStamps();
+async function loadStamps() {
+  const stampsList = document.getElementById("stamps-list");
+  const emptyState = document.getElementById("empty-state");
+
+  // Get all stamps from storage
+  chrome.storage.local.get(null, (items) => {
+    const allStamps = [];
+
+    // Collect all stamps from all pages
+    Object.keys(items).forEach((key) => {
+      if (key.startsWith("scrollstamp_")) {
+        const stamps = items[key];
+        if (Array.isArray(stamps)) {
+          stamps.forEach((stamp) => {
+            allStamps.push({ ...stamp, storageKey: key });
+          });
+        }
       }
     });
-  }
 
-  // Load stamps for current page
-  function loadStamps() {
-    chrome.storage.local.get([currentUrl], function (result) {
-      currentStamps = result[currentUrl] || [];
-      renderStamps();
-    });
-  }
+    // Sort by timestamp (newest first)
+    allStamps.sort((a, b) => b.timestamp - a.timestamp);
 
-  // Render stamps list
-  function renderStamps() {
-    var count = currentStamps.length;
-    stampCount.textContent = count + (count === 1 ? " stamp" : " stamps");
-
-    // Update button states
-    viewStampsBtn.disabled = count === 0;
-    clearStampsBtn.disabled = count === 0;
-
-    if (count === 0) {
-      stampsList.innerHTML =
-        '<div class="stamps-empty">' +
-        '<div class="stamps-empty-icon">📍</div>' +
-        "No stamps on this page yet<br>Click the 📌 button to create one!" +
-        "</div>";
+    if (allStamps.length === 0) {
+      emptyState.style.display = "flex";
+      stampsList.style.display = "none";
       return;
     }
 
+    emptyState.style.display = "none";
+    stampsList.style.display = "block";
     stampsList.innerHTML = "";
 
-    currentStamps.forEach(function (stamp, index) {
-      var item = document.createElement("div");
-      item.className = "stamp-item";
-
-      var percentage = getScrollPercentage(stamp.scrollY);
-      var timeAgo = getTimeAgo(stamp.createdAt);
-
-      item.innerHTML =
-        '<div class="stamp-item-info">' +
-        '<div class="stamp-item-label">' +
-        escapeHtml(stamp.label) +
-        "</div>" +
-        '<div class="stamp-item-meta">' +
-        percentage +
-        "% • " +
-        timeAgo +
-        "</div>" +
-        "</div>" +
-        '<span class="stamp-item-arrow">→</span>';
-
-      item.addEventListener("click", function () {
-        scrollToStamp(stamp.scrollY);
-      });
-
-      stampsList.appendChild(item);
-    });
-  }
-
-  // Get scroll percentage (approximate)
-  function getScrollPercentage(scrollY) {
-    // We estimate based on typical page heights
-    // The content script has accurate values
-    return Math.round((scrollY / Math.max(scrollY + 1000, 1)) * 100);
-  }
-
-  // Get human-readable time ago
-  function getTimeAgo(dateString) {
-    var date = new Date(dateString);
-    var now = new Date();
-    var seconds = Math.floor((now - date) / 1000);
-
-    if (seconds < 60) return "Just now";
-    if (seconds < 3600) return Math.floor(seconds / 60) + "m ago";
-    if (seconds < 86400) return Math.floor(seconds / 3600) + "h ago";
-    if (seconds < 604800) return Math.floor(seconds / 86400) + "d ago";
-
-    return date.toLocaleDateString();
-  }
-
-  // Scroll to stamp on page
-  function scrollToStamp(scrollY) {
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-      if (tabs[0]) {
-        chrome.tabs.sendMessage(
-          tabs[0].id,
-          {
-            action: "scrollToStamp",
-            scrollY: scrollY,
-          },
-          function (response) {
-            // Close popup after scrolling
-            window.close();
-          }
-        );
-      }
-    });
-  }
-
-  // View stamps on page (opens panel)
-  viewStampsBtn.addEventListener("click", function () {
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-      if (tabs[0]) {
-        chrome.tabs.sendMessage(
-          tabs[0].id,
-          {
-            action: "showPanel",
-          },
-          function (response) {
-            window.close();
-          }
-        );
-      }
+    allStamps.forEach((stamp) => {
+      const li = createStampElement(stamp);
+      stampsList.appendChild(li);
     });
   });
+}
 
-  // Clear all stamps for current page
-  clearStampsBtn.addEventListener("click", function () {
-    if (currentStamps.length === 0) return;
+function createStampElement(stamp) {
+  const li = document.createElement("li");
+  li.className = "stamp-item";
 
-    var confirmed = confirm(
-      "Clear all " + currentStamps.length + " stamps for this page?"
+  const timeAgo = formatTimeAgo(stamp.timestamp);
+
+  li.innerHTML = `
+    <span class="stamp-icon">📌</span>
+    <div class="stamp-content">
+      <div class="stamp-preview">${escapeHtml(
+        stamp.preview || "AI Response"
+      )}</div>
+      <div class="stamp-meta">
+        <span class="stamp-platform">${stamp.platform || "chat"}</span>
+        <span>${timeAgo}</span>
+      </div>
+    </div>
+    <button class="stamp-delete" title="Delete bookmark">✕</button>
+  `;
+
+  // Click to scroll
+  li.addEventListener("click", (e) => {
+    if (e.target.classList.contains("stamp-delete")) return;
+    scrollToStamp(stamp);
+  });
+
+  // Delete button
+  li.querySelector(".stamp-delete").addEventListener("click", (e) => {
+    e.stopPropagation();
+    deleteStamp(stamp);
+  });
+
+  return li;
+}
+
+async function scrollToStamp(stamp) {
+  // Get active tab
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+  if (!tab) return;
+
+  // Check if we're on the right page
+  if (!tab.url.includes(new URL(stamp.url).pathname.split("/")[1])) {
+    // Navigate to the page first
+    chrome.tabs.update(tab.id, { url: stamp.url }, () => {
+      // Wait for page load then scroll
+      setTimeout(() => {
+        chrome.tabs.sendMessage(tab.id, {
+          action: "scrollTo",
+          stamp: stamp,
+        });
+      }, 2000);
+    });
+  } else {
+    // Already on page, just scroll
+    chrome.tabs.sendMessage(tab.id, {
+      action: "scrollTo",
+      stamp: stamp,
+    });
+  }
+
+  window.close();
+}
+
+async function deleteStamp(stamp) {
+  chrome.storage.local.get([stamp.storageKey], (result) => {
+    const stamps = (result[stamp.storageKey] || []).filter(
+      (s) => s.id !== stamp.id
     );
-    if (!confirmed) return;
 
-    chrome.storage.local.remove([currentUrl], function () {
-      currentStamps = [];
-      renderStamps();
-    });
+    if (stamps.length === 0) {
+      chrome.storage.local.remove(stamp.storageKey, loadStamps);
+    } else {
+      chrome.storage.local.set({ [stamp.storageKey]: stamps }, loadStamps);
+    }
   });
+}
 
-  // Escape HTML
-  function escapeHtml(text) {
-    var div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
-  }
+function clearAllStamps() {
+  if (!confirm("Delete all bookmarks?")) return;
 
-  // Initialize
-  init();
-})();
+  chrome.storage.local.get(null, (items) => {
+    const keysToRemove = Object.keys(items).filter((key) =>
+      key.startsWith("scrollstamp_")
+    );
+    chrome.storage.local.remove(keysToRemove, loadStamps);
+  });
+}
+
+function formatTimeAgo(timestamp) {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+
+  return new Date(timestamp).toLocaleDateString();
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
