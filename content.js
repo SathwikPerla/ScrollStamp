@@ -37,6 +37,13 @@
     },
   };
 
+  function isChromeStorageAvailable() {
+    return (
+      typeof chrome !== "undefined" && chrome.storage && chrome.storage.local
+    );
+  }
+
+
   let floatingBtn = null;
   let currentPlatform = null;
 
@@ -136,28 +143,34 @@
   }
 
   // Save stamp to storage
-  async function saveStamp(stamp) {
-    const storageKey = `scrollstamp_${btoa(window.location.pathname).substring(
-      0,
-      20
-    )}`;
+ async function saveStamp(stamp) {
+   if (!isChromeStorageAvailable()) {
+     console.warn("ScrollStamp: chrome.storage not available yet");
+     return false;
+   }
 
-    return new Promise((resolve) => {
-      chrome.storage.local.get([storageKey], (result) => {
-        const stamps = result[storageKey] || [];
-        // Check for duplicate
-        const exists = stamps.some((s) => s.id === stamp.id);
-        if (!exists) {
-          stamps.push(stamp);
-          chrome.storage.local.set({ [storageKey]: stamps }, () => {
-            resolve(true);
-          });
-        } else {
-          resolve(false);
-        }
-      });
-    });
-  }
+   const storageKey = `scrollstamp_${btoa(window.location.pathname).substring(
+     0,
+     20
+   )}`;
+
+   return new Promise((resolve) => {
+     chrome.storage.local.get([storageKey], (result) => {
+       const stamps = result[storageKey] || [];
+       const exists = stamps.some((s) => s.id === stamp.id);
+
+       if (!exists) {
+         stamps.push(stamp);
+         chrome.storage.local.set({ [storageKey]: stamps }, () => {
+           resolve(true);
+         });
+       } else {
+         resolve(false);
+       }
+     });
+   });
+ }
+
 
   // Scroll to a specific message by finding it again
   function scrollToMessage(stamp) {
@@ -251,6 +264,7 @@
   }
 
   // Listen for messages from popup
+if (chrome?.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "getStamps") {
       const storageKey = `scrollstamp_${btoa(
@@ -283,14 +297,16 @@
       return true;
     }
   });
+}
 
   // Initialize
   function init() {
     currentPlatform = detectPlatform();
-    if (currentPlatform) {
-      createFloatingButton();
-      console.log(`ScrollStamp v2 initialized for ${currentPlatform}`);
-    }
+   if (currentPlatform && typeof chrome !== "undefined") {
+     createFloatingButton();
+     console.log(`ScrollStamp v2 initialized for ${currentPlatform}`);
+   }
+
   }
 
   // Wait for page to be ready
