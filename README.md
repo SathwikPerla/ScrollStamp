@@ -238,6 +238,7 @@ scrollstamp/
 <summary><strong>Bookmark doesn't scroll to the right position</strong></summary>
 
 This can happen if:
+- saved bookmark working as a link and opening it on your current tab
 - The page content has changed significantly since bookmarking
 - The page uses dynamic/lazy loading
 - You're on a different conversation/thread
@@ -250,9 +251,10 @@ This can happen if:
 
 **Solutions:**
 1. Refresh the page
-2. Check if you're on a supported platform
-3. Disable and re-enable the extension
-4. Check for conflicts with other extensions
+2. ensure your cursor isnt on the website url when pressing a bookmark
+3. Check if you're on a supported platform
+4. Disable and re-enable the extension
+5. Check for conflicts with other extensions
 </details>
 
 <details>
