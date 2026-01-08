@@ -1,4 +1,4 @@
-# 📌 ScrollStamp
+# 📌 ScrollStamp v2(LLM based)
 
 > Bookmark AI assistant messages in chat conversations
 
