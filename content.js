@@ -1,269 +1,552 @@
+// ScrollStamp - Unified bookmarking extension
+// v2 (message-based) for AI chat platforms, v1 (scroll-based) for everything else
+
 (function () {
   "use strict";
 
-  // Prevent multiple injections
-  if (window.__scrollStampLoaded) return;
-  window.__scrollStampLoaded = true;
+  // ============================================
+  // PLATFORM DETECTION & CONFIGURATION
+  // ============================================
 
-  // Create the floating stamp button
-  const stampButton = document.createElement("div");
-  stampButton.id = "scrollstamp-button";
-  stampButton.innerHTML = "📌";
-  stampButton.title = "Create ScrollStamp";
+  // AI chat platforms that use message-based bookmarking (v2)
+  const AI_PLATFORM_SELECTORS = {
+    chatgpt: {
+      assistant: '[data-message-author-role="assistant"]',
+      container: "main",
+      messageText: ".markdown",
+    },
+    claude: {
+      assistant: '[data-testid="assistant-message"], .font-claude-message',
+      container: "main",
+      messageText: ".prose",
+    },
+    gemini: {
+      assistant: '[data-message-author="1"], .model-response-text',
+      container: "main",
+      messageText: ".message-content",
+    },
+    perplexity: {
+      assistant: '[data-testid="answer-content"], .prose',
+      container: "main",
+      messageText: ".prose",
+    },
+    grok: {
+      assistant: '[data-testid="assistant-message"]',
+      container: "main",
+      messageText: ".message-content",
+    },
+    deepseek: {
+      assistant: ".ds-markdown",
+      container: "main",
+      messageText: ".ds-markdown",
+    },
+  };
 
-  // Create the label that appears on hover
-  const stampLabel = document.createElement("span");
-  stampLabel.id = "scrollstamp-label";
-  stampLabel.textContent = "Stamp";
-  stampButton.appendChild(stampLabel);
-
-  // Create toast notification container
-  const toast = document.createElement("div");
-  toast.id = "scrollstamp-toast";
-  document.body.appendChild(toast);
-
-  // Add button to page
-  document.body.appendChild(stampButton);
-
-  // Show toast notification
-  function showToast(message, duration = 2000) {
-    toast.textContent = message;
-    toast.classList.add("show");
-    setTimeout(function () {
-      toast.classList.remove("show");
-    }, duration);
+  // Detect if current site is an AI chat platform
+  function detectAIPlatform() {
+    const host = window.location.hostname;
+    if (host.includes("chatgpt") || host.includes("chat.openai"))
+      return "chatgpt";
+    if (host.includes("claude")) return "claude";
+    if (host.includes("gemini")) return "gemini";
+    if (host.includes("perplexity")) return "perplexity";
+    if (host.includes("grok")) return "grok";
+    if (host.includes("deepseek")) return "deepseek";
+    return null;
   }
 
-  // Get current page URL (normalized)
-  function getPageUrl() {
-    return window.location.href.split("#")[0];
-  }
-
-  // Get scroll percentage
-  function getScrollPercentage(scrollY) {
-    var docHeight = document.documentElement.scrollHeight - window.innerHeight;
-    if (docHeight <= 0) return 0;
-    return Math.round((scrollY / docHeight) * 100);
-  }
-
-  // Save a stamp
-  function saveStamp(scrollY, label) {
-    var url = getPageUrl();
-    var stamp = {
-      scrollY: scrollY,
-      label: label || "Stamp at " + getScrollPercentage(scrollY) + "%",
-      createdAt: new Date().toISOString(),
-    };
-
-    chrome.storage.local.get([url], function (result) {
-      var stamps = result[url] || [];
-      stamps.push(stamp);
-
-      var data = {};
-      data[url] = stamps;
-
-      chrome.storage.local.set(data, function () {
-        showToast("✓ Stamp saved!");
-      });
-    });
-  }
-
-  // Handle stamp button click
-  stampButton.addEventListener("click", function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    var currentScrollY = window.scrollY;
-    var percentage = getScrollPercentage(currentScrollY);
-
-    // Prompt for optional label
-    var label = prompt(
-      "Add a label for this stamp (optional):\n\nScroll position: " +
-        percentage +
-        "%",
-      ""
+  // Detect if current page is a PDF
+  function isPDFPage() {
+    const url = window.location.href.toLowerCase();
+    const contentType = document.contentType || "";
+    return (
+      url.endsWith(".pdf") ||
+      contentType.includes("pdf") ||
+      document.querySelector('embed[type="application/pdf"]') !== null ||
+      document.body?.children[0]?.tagName === "EMBED"
     );
+  }
 
-    // If user cancelled the prompt, don't save
-    if (label === null) return;
+  let floatingBtn = null;
+  let currentPlatform = null;
+  let isAIChat = false;
+  let isPDF = false;
 
-    saveStamp(currentScrollY, label.trim() || null);
-  });
+  // ============================================
+  // V2: MESSAGE-BASED BOOKMARKING (AI Chats)
+  // ============================================
 
-  // Create stamps panel
-  var stampsPanel = document.createElement("div");
-  stampsPanel.id = "scrollstamp-panel";
-  stampsPanel.innerHTML =
-    '<div class="scrollstamp-panel-header"><span>📌 Stamps</span><button id="scrollstamp-panel-close">×</button></div><div id="scrollstamp-panel-list"></div>';
-  document.body.appendChild(stampsPanel);
+  function getAssistantMessages() {
+    if (!currentPlatform || !AI_PLATFORM_SELECTORS[currentPlatform]) return [];
+    const selector = AI_PLATFORM_SELECTORS[currentPlatform].assistant;
+    if (!selector) return [];
+    return Array.from(document.querySelectorAll(selector));
+  }
 
-  // Close panel button
-  document
-    .getElementById("scrollstamp-panel-close")
-    .addEventListener("click", function () {
-      stampsPanel.classList.remove("show");
+  function findNearestAssistantMessage() {
+    const messages = getAssistantMessages();
+    if (messages.length === 0) return null;
+
+    const viewportCenter = window.innerHeight / 2;
+    let nearest = null;
+    let minDistance = Infinity;
+
+    messages.forEach((msg, index) => {
+      const rect = msg.getBoundingClientRect();
+      if (rect.top < window.innerHeight && rect.bottom > 0) {
+        const msgCenter = rect.top + rect.height / 2;
+        const distance = Math.abs(msgCenter - viewportCenter);
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearest = { element: msg, index };
+        }
+      }
     });
 
-  // Double-click to show stamps panel
-  stampButton.addEventListener("dblclick", function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-    showStampsPanel();
-  });
+    if (!nearest) {
+      messages.forEach((msg, index) => {
+        const rect = msg.getBoundingClientRect();
+        const distance = Math.abs(rect.top);
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearest = { element: msg, index };
+        }
+      });
+    }
 
-  // Show stamps panel
-  function showStampsPanel() {
-    var url = getPageUrl();
-    var listContainer = document.getElementById("scrollstamp-panel-list");
+    return nearest;
+  }
 
-    chrome.storage.local.get([url], function (result) {
-      var stamps = result[url] || [];
+  function getMessagePreview(element) {
+    const textSelector = AI_PLATFORM_SELECTORS[currentPlatform]?.messageText;
+    const textEl = textSelector ? element.querySelector(textSelector) : element;
+    const text = (textEl || element).textContent || "";
+    return text.trim().substring(0, 100).replace(/\s+/g, " ");
+  }
 
-      if (stamps.length === 0) {
-        listContainer.innerHTML =
-          '<div class="scrollstamp-empty">No stamps on this page yet.<br>Click 📌 to create one!</div>';
-      } else {
-        listContainer.innerHTML = "";
+  function generateMessageId(element, index) {
+    const preview = getMessagePreview(element);
+    let hash = 0;
+    for (let i = 0; i < preview.length; i++) {
+      const char = preview.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
+    }
+    return `msg_${index}_${Math.abs(hash).toString(36)}`;
+  }
 
-        stamps.forEach(function (stamp, index) {
-          var item = document.createElement("div");
-          item.className = "scrollstamp-item";
+  function createMessageStamp(messageInfo) {
+    const preview = getMessagePreview(messageInfo.element);
+    return {
+      id: generateMessageId(messageInfo.element, messageInfo.index),
+      type: "message", // v2 type
+      index: messageInfo.index,
+      preview: preview,
+      title: "", // User-editable title (empty by default)
+      timestamp: Date.now(),
+      url: window.location.href,
+      hostname: window.location.hostname,
+      platform: currentPlatform,
+    };
+  }
 
-          var percentage = getScrollPercentage(stamp.scrollY);
+  function scrollToMessage(stamp) {
+    const messages = getAssistantMessages();
 
-          item.innerHTML =
-            '<div class="scrollstamp-item-info">' +
-            '<span class="scrollstamp-item-label">' +
-            escapeHtml(stamp.label) +
-            "</span>" +
-            '<span class="scrollstamp-item-percent">' +
-            percentage +
-            "% down</span>" +
-            "</div>" +
-            '<button class="scrollstamp-item-delete" data-index="' +
-            index +
-            '">🗑️</button>';
+    if (stamp.index < messages.length) {
+      const targetByIndex = messages[stamp.index];
+      const preview = getMessagePreview(targetByIndex);
 
-          // Click to scroll
-          item
-            .querySelector(".scrollstamp-item-info")
-            .addEventListener("click", function () {
-              window.scrollTo({
-                top: stamp.scrollY,
-                behavior: "smooth",
-              });
-              stampsPanel.classList.remove("show");
+      if (preview.startsWith(stamp.preview.substring(0, 30))) {
+        smoothScrollTo(targetByIndex);
+        return true;
+      }
+    }
 
-              // Brief highlight effect at destination
-              setTimeout(function () {
-                showScrollIndicator(stamp.scrollY);
-              }, 500);
-            });
+    for (const msg of messages) {
+      const preview = getMessagePreview(msg);
+      if (preview.startsWith(stamp.preview.substring(0, 30))) {
+        smoothScrollTo(msg);
+        return true;
+      }
+    }
 
-          // Delete button
-          item
-            .querySelector(".scrollstamp-item-delete")
-            .addEventListener("click", function (e) {
-              e.stopPropagation();
-              deleteStamp(index);
-            });
+    return false;
+  }
 
-          listContainer.appendChild(item);
-        });
+  // ============================================
+  // V1: SCROLL-BASED BOOKMARKING (All other sites)
+  // ============================================
+
+  function getScrollPercentage() {
+    // For PDFs, Chrome's built-in viewer uses a plugin element
+    if (isPDF) {
+      // Try to find the PDF viewer's internal scroll container
+      const pdfViewer = document.querySelector("#viewer");
+      const pdfContainer = document.querySelector("#viewerContainer");
+      const embed = document.querySelector('embed[type="application/pdf"]');
+      const pdfPlugin = document.querySelector("embed, object");
+
+      // Method 1: Check for PDF.js viewer (used by many sites and Firefox)
+      if (pdfViewer && pdfContainer) {
+        const scrollTop = pdfContainer.scrollTop;
+        const scrollHeight =
+          pdfContainer.scrollHeight - pdfContainer.clientHeight;
+        if (scrollHeight > 0) {
+          return Math.round((scrollTop / scrollHeight) * 100);
+        }
       }
 
-      stampsPanel.classList.add("show");
-    });
+      // Method 2: For Chrome's native PDF viewer, use page scroll
+      // The plugin takes over the whole page, so window scroll should work
+      const scrollTop =
+        window.pageYOffset ||
+        window.scrollY ||
+        document.documentElement.scrollTop ||
+        document.body.scrollTop ||
+        0;
+      const docHeight = Math.max(
+        document.body.scrollHeight || 0,
+        document.documentElement.scrollHeight || 0,
+        document.body.offsetHeight || 0,
+        document.documentElement.offsetHeight || 0
+      );
+      const scrollHeight = docHeight - window.innerHeight;
+
+      // If we can't calculate scroll (single-page PDF or plugin blocking), use 0
+      if (scrollHeight <= 0) {
+        // Try to estimate based on visible content
+        return 0;
+      }
+
+      return Math.round((scrollTop / scrollHeight) * 100);
+    }
+
+    // Regular pages
+    const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+    const scrollHeight =
+      document.documentElement.scrollHeight - window.innerHeight;
+    if (scrollHeight <= 0) return 0;
+    return Math.round((scrollTop / scrollHeight) * 100);
   }
 
-  // Delete a stamp
-  function deleteStamp(index) {
-    var url = getPageUrl();
-
-    chrome.storage.local.get([url], function (result) {
-      var stamps = result[url] || [];
-      stamps.splice(index, 1);
-
-      var data = {};
-      data[url] = stamps;
-
-      chrome.storage.local.set(data, function () {
-        showStampsPanel(); // Refresh panel
-        showToast("Stamp deleted");
-      });
-    });
+  function getPageTitle() {
+    return document.title || window.location.hostname;
   }
 
-  // Show scroll indicator at destination
-  function showScrollIndicator(scrollY) {
-    var indicator = document.createElement("div");
-    indicator.id = "scrollstamp-indicator";
-    indicator.style.top = scrollY + "px";
-    document.body.appendChild(indicator);
+  function getContextPreview() {
+    // Try to get some context from visible content
+    const viewportCenter = window.innerHeight / 2;
+    const elements = document.elementsFromPoint(
+      window.innerWidth / 2,
+      viewportCenter
+    );
 
-    // Trigger animation
-    requestAnimationFrame(function () {
-      indicator.classList.add("show");
-    });
-
-    // Remove after animation
-    setTimeout(function () {
-      indicator.classList.remove("show");
-      setTimeout(function () {
-        if (indicator.parentNode) {
-          indicator.parentNode.removeChild(indicator);
+    for (const el of elements) {
+      if (
+        [
+          "P",
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5",
+          "H6",
+          "LI",
+          "DIV",
+          "ARTICLE",
+          "SECTION",
+        ].includes(el.tagName)
+      ) {
+        const text = el.textContent?.trim();
+        if (text && text.length > 10) {
+          return text.substring(0, 100).replace(/\s+/g, " ");
         }
-      }, 300);
-    }, 1000);
+      }
+    }
+
+    return `${getScrollPercentage()}% scrolled`;
   }
 
-  // Escape HTML to prevent XSS
-  function escapeHtml(text) {
-    var div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
+  function createScrollStamp() {
+    const scrollPercent = getScrollPercentage();
+    const preview = getContextPreview();
+
+    // Get the actual scroll position from various sources
+    let scrollY =
+      window.scrollY ||
+      window.pageYOffset ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      0;
+
+    // For PDFs, also try the PDF container
+    if (isPDF) {
+      const pdfContainer = document.querySelector("#viewerContainer");
+      if (pdfContainer) {
+        scrollY = pdfContainer.scrollTop;
+      }
+    }
+
+    return {
+      id: `scroll_${scrollPercent}_${Date.now().toString(36)}`,
+      type: isPDF ? "pdf" : "scroll", // v1 type with PDF distinction
+      scrollPercent: scrollPercent,
+      scrollY: scrollY,
+      preview: preview,
+      pageTitle: getPageTitle(),
+      title: "", // User-editable title (empty by default)
+      timestamp: Date.now(),
+      url: window.location.href,
+      hostname: window.location.hostname,
+      platform: isPDF ? "PDF" : "web",
+    };
   }
 
-  // Listen for messages from popup
-  chrome.runtime.onMessage.addListener(function (
-    request,
-    sender,
-    sendResponse
-  ) {
-    if (request.action === "getStamps") {
-      var url = getPageUrl();
-      chrome.storage.local.get([url], function (result) {
-        sendResponse({
-          stamps: result[url] || [],
-          url: url,
-          title: document.title,
+  function scrollToPosition(stamp) {
+    // For PDFs, try PDF.js container first
+    if (stamp.type === "pdf") {
+      const pdfContainer = document.querySelector("#viewerContainer");
+      if (pdfContainer && stamp.scrollY !== undefined) {
+        pdfContainer.scrollTo({
+          top: stamp.scrollY,
+          behavior: "smooth",
         });
-      });
-      return true; // Keep channel open for async response
+        return true;
+      }
     }
 
-    if (request.action === "scrollToStamp") {
+    // Try scrollY first for exact position
+    if (stamp.scrollY !== undefined && stamp.scrollY > 0) {
       window.scrollTo({
-        top: request.scrollY,
+        top: stamp.scrollY,
         behavior: "smooth",
-      });
-      setTimeout(function () {
-        showScrollIndicator(request.scrollY);
-      }, 500);
-      sendResponse({ success: true });
-    }
-
-    if (request.action === "clearStamps") {
-      var url = getPageUrl();
-      chrome.storage.local.remove([url], function () {
-        sendResponse({ success: true });
       });
       return true;
     }
 
-    if (request.action === "showPanel") {
-      showStampsPanel();
-      sendResponse({ success: true });
+    // Fallback to percentage-based scroll
+    if (stamp.scrollPercent !== undefined && stamp.scrollPercent > 0) {
+      const scrollHeight =
+        document.documentElement.scrollHeight - window.innerHeight;
+      const targetY = (stamp.scrollPercent / 100) * scrollHeight;
+      window.scrollTo({
+        top: targetY,
+        behavior: "smooth",
+      });
+      return true;
+    }
+
+    return false;
+  }
+
+  // ============================================
+  // SHARED UTILITIES
+  // ============================================
+
+  function getStorageKey() {
+    return `scrollstamp_${btoa(window.location.pathname).substring(0, 20)}`;
+  }
+
+  async function saveStamp(stamp) {
+    const storageKey = getStorageKey();
+
+    return new Promise((resolve) => {
+      chrome.storage.local.get([storageKey], (result) => {
+        const stamps = result[storageKey] || [];
+        const exists = stamps.some((s) => s.id === stamp.id);
+        if (!exists) {
+          stamps.push(stamp);
+          chrome.storage.local.set({ [storageKey]: stamps }, () => {
+            resolve(true);
+          });
+        } else {
+          resolve(false);
+        }
+      });
+    });
+  }
+
+  function smoothScrollTo(element) {
+    element.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+
+    element.classList.add("scrollstamp-highlight");
+    setTimeout(() => {
+      element.classList.remove("scrollstamp-highlight");
+    }, 2000);
+  }
+
+  function showToast(message) {
+    const existing = document.getElementById("scrollstamp-toast");
+    if (existing) existing.remove();
+
+    const toast = document.createElement("div");
+    toast.id = "scrollstamp-toast";
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.classList.add("scrollstamp-toast-hide");
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
+  }
+
+  // ============================================
+  // UI & INITIALIZATION
+  // ============================================
+
+  function createFloatingButton() {
+    if (floatingBtn) return;
+
+    floatingBtn = document.createElement("div");
+    floatingBtn.id = "scrollstamp-pin";
+    floatingBtn.innerHTML = "📌";
+    floatingBtn.title = isAIChat
+      ? "Bookmark this AI message"
+      : isPDF
+      ? "Bookmark this PDF position"
+      : "Bookmark this scroll position";
+
+    floatingBtn.addEventListener("click", async () => {
+      let stamp;
+      let saved;
+
+      if (isAIChat) {
+        // V2: Message-based bookmarking
+        const nearest = findNearestAssistantMessage();
+        if (nearest) {
+          stamp = createMessageStamp(nearest);
+          saved = await saveStamp(stamp);
+
+          if (saved) {
+            showToast("Message bookmarked!");
+          } else {
+            showToast("Already bookmarked");
+          }
+        } else {
+          showToast("No AI message found nearby");
+          return;
+        }
+      } else {
+        // V1: Scroll-based bookmarking
+        stamp = createScrollStamp();
+        saved = await saveStamp(stamp);
+
+        if (saved) {
+          showToast(`Position bookmarked (${stamp.scrollPercent}%)`);
+        } else {
+          showToast("Already bookmarked");
+        }
+      }
+
+      if (saved) {
+        floatingBtn.classList.add("scrollstamp-success");
+        setTimeout(
+          () => floatingBtn.classList.remove("scrollstamp-success"),
+          500
+        );
+      }
+    });
+
+    document.body.appendChild(floatingBtn);
+  }
+
+  // Handle scroll to stamp (called from popup)
+  function handleScrollTo(stamp) {
+    if (stamp.type === "message") {
+      return scrollToMessage(stamp);
+    } else {
+      return scrollToPosition(stamp);
+    }
+  }
+
+  // Listen for messages from popup
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "getStamps") {
+      const storageKey = getStorageKey();
+      chrome.storage.local.get([storageKey], (result) => {
+        sendResponse({ stamps: result[storageKey] || [] });
+      });
+      return true;
+    }
+
+    if (request.action === "scrollTo") {
+      const success = handleScrollTo(request.stamp);
+      sendResponse({ success });
+      return true;
+    }
+
+    if (request.action === "deleteStamp") {
+      const storageKey = getStorageKey();
+      chrome.storage.local.get([storageKey], (result) => {
+        const stamps = (result[storageKey] || []).filter(
+          (s) => s.id !== request.stampId
+        );
+        chrome.storage.local.set({ [storageKey]: stamps }, () => {
+          sendResponse({ success: true });
+        });
+      });
+      return true;
+    }
+
+    if (request.action === "getMode") {
+      sendResponse({
+        isAIChat: isAIChat,
+        isPDF: isPDF,
+        platform: currentPlatform,
+      });
+      return true;
+    }
+
+    if (request.action === "updateTitle") {
+      const storageKey = getStorageKey();
+      chrome.storage.local.get([storageKey], (result) => {
+        const stamps = result[storageKey] || [];
+        const stampIndex = stamps.findIndex((s) => s.id === request.stampId);
+        if (stampIndex !== -1) {
+          stamps[stampIndex].title = request.title;
+          chrome.storage.local.set({ [storageKey]: stamps }, () => {
+            sendResponse({ success: true });
+          });
+        } else {
+          sendResponse({ success: false });
+        }
+      });
+      return true;
     }
   });
+
+  function init() {
+    currentPlatform = detectAIPlatform();
+    isAIChat = currentPlatform !== null;
+    isPDF = isPDFPage();
+
+    createFloatingButton();
+
+    const mode = isAIChat
+      ? `AI Chat (${currentPlatform})`
+      : isPDF
+      ? "PDF Mode"
+      : "Scroll Mode";
+    console.log(`ScrollStamp initialized - ${mode}`);
+  }
+
+  // Wait for page to be ready
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  // Re-init on SPA navigation
+  let lastUrl = location.href;
+  new MutationObserver(() => {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      setTimeout(init, 500);
+    }
+  }).observe(document.body, { subtree: true, childList: true });
 })();

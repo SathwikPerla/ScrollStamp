@@ -1,6 +1,4 @@
-/* ==========================================
-   ScrollStamp - Popup Styles
-   ========================================== */
+/* ScrollStamp - Unified Popup Styles */
 
 * {
   margin: 0;
@@ -9,206 +7,330 @@
 }
 
 body {
-  width: 320px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: #ffffff;
-  color: #333;
+  width: 340px;
+  min-height: 200px;
+  max-height: 480px;
+  background: #0f0f1a;
+  color: #e0e0e0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .popup-container {
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
-/* Header */
 .popup-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #1a1a2e, #16162a);
+  border-bottom: 1px solid #2a2a4a;
 }
 
-.popup-icon {
-  font-size: 24px;
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.popup-title {
-  font-size: 18px;
+.popup-header h1 {
+  font-size: 16px;
   font-weight: 600;
+  color: #ffffff;
 }
 
-/* Page Info */
-.page-info {
-  padding: 16px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.page-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 4px;
-}
-
-.stamp-count {
-  font-size: 12px;
-  color: #666;
-}
-
-/* Stamps Section */
-.stamps-section {
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.stamps-header {
-  padding: 12px 16px;
+.version {
   font-size: 11px;
-  font-weight: 600;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.15);
+  padding: 3px 8px;
+  border-radius: 10px;
+}
+
+.mode-badge {
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #888;
-  background: #fafafa;
-  border-bottom: 1px solid #f0f0f0;
 }
 
-.stamps-list {
-  min-height: 60px;
+.mode-badge.ai-mode {
+  background: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.mode-badge.scroll-mode {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.mode-badge.pdf-mode {
+  background: rgba(251, 146, 60, 0.2);
+  color: #fb923c;
+  border: 1px solid rgba(251, 146, 60, 0.3);
+}
+
+.mode-note {
+  padding: 10px 16px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #c7c7da;
+  background: rgba(251, 146, 60, 0.08);
+  border-bottom: 1px solid #2a2a4a;
+}
+
+#stamps-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: #6a6a8a;
+}
+
+.empty-state p {
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.empty-state span {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+#stamps-list {
+  list-style: none;
 }
 
 .stamp-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid #f0f0f0;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  background: #1a1a2e;
+  border-radius: 8px;
+  margin-bottom: 8px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
 }
 
 .stamp-item:hover {
-  background: #f8f9fa;
+  background: #22223a;
+  border-color: #3a3a5a;
 }
 
-.stamp-item:last-child {
-  border-bottom: none;
+.stamp-icon {
+  font-size: 18px;
+  flex-shrink: 0;
 }
 
-.stamp-item-info {
+.stamp-content {
   flex: 1;
   min-width: 0;
 }
 
-.stamp-item-label {
+.stamp-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stamp-title-input {
+  flex: 1;
   font-size: 13px;
+  color: #d0d0d0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 6px;
+  line-height: 1.3;
+  font-family: inherit;
+  min-width: 0;
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Only show editable styles when NOT readonly (after pencil click) */
+.stamp-title-input:not([readonly]) {
+  cursor: text;
+  pointer-events: auto;
+  user-select: text;
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+  color: #ffffff;
+}
+
+.stamp-title-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.15);
+  color: #ffffff;
+}
+
+.stamp-edit-btn {
+  padding: 2px 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.stamp-item:hover .stamp-edit-btn {
+  opacity: 0.7;
+}
+
+.stamp-edit-btn:hover {
+  opacity: 1 !important;
+}
+
+.stamp-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #6a6a8a;
+  flex-wrap: wrap;
+}
+
+.stamp-type {
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: capitalize;
   font-weight: 500;
-  color: #333;
+}
+
+.stamp-type.message {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+}
+
+.stamp-type.scroll {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+.stamp-type.pdf {
+  background: rgba(251, 146, 60, 0.15);
+  color: #fb923c;
+}
+
+.stamp-hostname {
+  color: #8b8bff;
+  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 2px;
+  max-width: 120px;
+  cursor: default;
+  user-select: none;
 }
 
-.stamp-item-meta {
-  font-size: 11px;
-  color: #888;
+.stamp-platform {
+  background: rgba(99, 102, 241, 0.15);
+  color: #8b8bff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: capitalize;
 }
 
-.stamp-item-arrow {
-  color: #ccc;
+.stamp-delete {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: #8a6a6a;
+  cursor: pointer;
   font-size: 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-.stamps-empty {
-  padding: 24px 16px;
-  text-align: center;
-  color: #888;
-  font-size: 13px;
+.stamp-delete:hover {
+  background: rgba(220, 38, 38, 0.2);
+  color: #ef4444;
 }
 
-.stamps-empty-icon {
-  font-size: 32px;
-  margin-bottom: 8px;
-  opacity: 0.5;
-}
-
-/* Actions */
-.popup-actions {
+.popup-footer {
+  padding: 10px 16px;
+  border-top: 1px solid #2a2a4a;
+  background: #0f0f1a;
   display: flex;
   gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid #e0e0e0;
+  align-items: center;
 }
 
-.btn {
+.btn-clear {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 12px;
-  border: none;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 500;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  color: #8a8aaa;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.btn-secondary {
-  background: #f0f0f0;
-  color: #333;
+.btn-clear:hover {
+  background: rgba(220, 38, 38, 0.1);
+  border-color: #dc2626;
+  color: #ef4444;
 }
 
-.btn-secondary:hover {
-  background: #e0e0e0;
+.github-link {
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  color: #fbbf24;
+  font-size: 12px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
-.btn-danger {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.btn-danger:hover {
-  background: #fecaca;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Footer */
-.popup-footer {
-  padding: 12px 16px;
-  background: #fafafa;
-  border-top: 1px solid #f0f0f0;
-  font-size: 11px;
-  color: #888;
-  text-align: center;
+.github-link:hover {
+  background: rgba(251, 191, 36, 0.1);
+  border-color: #fbbf24;
+  color: #fcd34d;
 }
 
 /* Scrollbar */
-.stamps-section::-webkit-scrollbar {
+#stamps-container::-webkit-scrollbar {
   width: 6px;
 }
 
-.stamps-section::-webkit-scrollbar-track {
-  background: #f0f0f0;
+#stamps-container::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.stamps-section::-webkit-scrollbar-thumb {
-  background: #ccc;
+#stamps-container::-webkit-scrollbar-thumb {
+  background: #3a3a5a;
   border-radius: 3px;
 }
 
-.stamps-section::-webkit-scrollbar-thumb:hover {
-  background: #aaa;
+#stamps-container::-webkit-scrollbar-thumb:hover {
+  background: #4a4a6a;
 }
-
