@@ -259,5 +259,5 @@ SOFTWARE.
 </p>
 
 <p align="center">
-  Made with ❤️ for the AI chat community
+  Made with ❤️ by Sathwik Perla for the AI chat community
 </p>
