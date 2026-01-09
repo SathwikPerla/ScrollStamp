@@ -144,5 +144,5 @@ Having issues? Please open an issue on the repository with:
 ---
 
 <p align="center">
-  Made with ❤️ for the AI chat community
+  Made with ❤️ by Sathwik Perla for the AI chat community
 </p>
