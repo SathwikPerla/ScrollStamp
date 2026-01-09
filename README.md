@@ -380,7 +380,7 @@ Having issues? We're here to help!
 ---
 
 <p align="center">
-  <strong>Made with ❤️ for the AI chat community</strong>
+  <strong>Made with ❤️ by Sathwik Perla for the AI chat community</strong>
 </p>
 
 <p align="center">
