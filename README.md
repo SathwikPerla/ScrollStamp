@@ -1,213 +1,156 @@
-<p align="center">
-  <img src="icon.png" alt="ScrollStamp Logo" width="128" height="128">
-</p>
+# 📌 ScrollStamp
 
-<h1 align="center">📌 ScrollStamp Hybrid (V1 + V2)</h1>
+> Smart bookmarking for the web — Message-based for AI chats, scroll-based for everything else.
 
-<p align="center">
-  <strong>Smart bookmarking for AI conversations and web content</strong>
-</p>
-
-<p align="center">
-  <a href="#-features">Features</a> •
-  <a href="#-supported-platforms">Platforms</a> •
-  <a href="#-installation">Installation</a> •
-  <a href="#-usage">Usage</a> •
-  <a href="#-technical-details">Technical</a> •
-  <a href="#-troubleshooting">Help</a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/version-2.1.0-blue.svg" alt="Version">
-  <img src="https://img.shields.io/badge/chrome-extension-green.svg" alt="Chrome Extension">
-  <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
-</p>
+ScrollStamp is a browser extension that intelligently adapts its bookmarking behavior based on the website you're visiting. On AI chat platforms, it bookmarks specific assistant messages. On all other websites, it bookmarks your scroll position.
 
 ---
 
-## 🎯 What is ScrollStamp?
+## 🎯 How It Works
 
-**ScrollStamp** is a Chrome extension that intelligently bookmarks content based on context:
+| Site Type | Mode | What Gets Bookmarked |
+|-----------|------|---------------------|
+| AI Chat Platforms | **Message Mode** | Specific AI assistant responses |
+| All Other Websites | **Scroll Mode** | Scroll position (with context preview) |
 
-| Context | Mode | How it Works |
-|---------|------|--------------|
-| **AI Chat Platforms** | 🤖 Message Mode (V2) | Bookmarks specific AI assistant responses |
-| **All Other Websites** | 📜 Scroll Mode (V1) | Captures scroll position with context preview |
-
-> **Note:** PDF documents are not supported as they are not standard web pages.
-
-Never lose track of important AI responses or web content again!
+The extension automatically detects which mode to use — no configuration needed.
 
 ---
 
 ## ✨ Features
 
-### 🔥 Core Features
+### Universal Features
+- 📌 **Floating Pin Button** — One-click bookmarking on any page
+- 💾 **Persistent Storage** — Bookmarks survive browser restarts
+- 🔍 **Smart Previews** — See context for each bookmark
+- ⏱️ **Timestamps** — Know when you saved each bookmark
+- 🎯 **Precise Navigation** — Jump directly to your saved position
+- 🎨 **Visual Feedback** — Toast notifications and highlight animations
 
-- **📌 One-Click Bookmarking** — Floating button appears on supported pages
-- **💾 Persistent Storage** — Bookmarks saved across browser sessions
-- **🎯 Precise Navigation** — Jump directly to bookmarked content
-- **✏️ Editable Titles** — Rename bookmarks for easy identification
-- **🎨 Visual Feedback** — Animated highlights when navigating
-- **🔒 Robust Error Handling** — Graceful recovery from extension reloads
+### Message Mode (AI Chats)
+- 🤖 **Platform Detection** — Auto-detects ChatGPT, Claude, Gemini, Perplexity, Grok, DeepSeek
+- 💬 **Message Identification** — Bookmarks the nearest AI response
+- 📝 **Text Previews** — Shows first 100 characters of the message
+- 🔄 **SPA Support** — Works with single-page app navigation
 
-### 🤖 AI Chat Mode (Message-Based)
-
-| Feature | Description |
-|---------|-------------|
-| Smart Detection | Automatically identifies AI assistant messages |
-| Message Preview | Shows snippet of bookmarked content |
-| Platform-Specific | Optimized selectors for each AI platform |
-| Conversation Context | Maintains accuracy even in long threads |
-
-### 📜 Scroll Mode (Position-Based)
-
-| Feature | Description |
-|---------|-------------|
-| Position Tracking | Saves exact scroll percentage |
-| Context Capture | Extracts visible text as preview |
-| Universal Compatibility | Works on any scrollable webpage |
+### Scroll Mode (All Websites)
+- 📍 **Position Tracking** — Saves exact scroll position
+- 📊 **Percentage Display** — Shows scroll percentage (e.g., "45%")
+- 📖 **Context Capture** — Extracts visible text as preview
+- 🏷️ **Page Titles** — Includes page title for easy identification
 
 ---
 
-## 🌐 Supported Platforms
-
-### AI Chat Platforms (Message Mode)
+## 🌐 Supported AI Platforms
 
 | Platform | Domain | Status |
 |----------|--------|--------|
-| ChatGPT | `chat.openai.com` / `chatgpt.com` | ✅ Fully Supported |
-| Claude | `claude.ai` | ✅ Fully Supported |
-| Google Gemini | `gemini.google.com` | ✅ Fully Supported |
-| Perplexity | `perplexity.ai` | ✅ Fully Supported |
-| Grok | `grok.x.ai` / `x.com/i/grok` | ✅ Fully Supported |
-| DeepSeek | `chat.deepseek.com` | ✅ Fully Supported |
+| ChatGPT | `chatgpt.com`, `chat.openai.com` | ✅ Full Support |
+| Claude | `claude.ai` | ✅ Full Support |
+| Gemini | `gemini.google.com` | ✅ Full Support |
+| Perplexity | `perplexity.ai` | ✅ Full Support |
+| Grok | `grok.x.ai` | ✅ Full Support |
+| DeepSeek | `chat.deepseek.com` | ✅ Full Support |
 
-### Other Platforms (Scroll Mode)
-
-| Platform | Support |
-|----------|---------|
-| All Websites | ✅ Universal Support |
-| PDF Documents | ❌ Not Supported |
+All other websites automatically use **Scroll Mode**.
 
 ---
 
-## 📦 Installation
+## 📁 Project Structure
+
+```
+scrollstamp/
+├── manifest.json      # Extension configuration
+├── content.js         # Unified content script (v1 + v2 logic)
+├── content.css        # Floating button & highlight styles
+├── popup.html         # Extension popup interface
+├── popup.css          # Popup styling
+├── popup.js           # Popup logic & stamp management
+└── README.md          # This file
+```
+
+---
+
+## 🚀 Installation
 
 ### From Source (Developer Mode)
 
-1. **Download the Extension**
-   ```bash
-   # Clone the repository
-   git clone https://github.com/YOUR_USERNAME/scrollstamp.git
-   
-   # Or download as ZIP and extract
-   ```
-
-2. **Open Chrome Extensions**
-   - Navigate to `chrome://extensions/`
-   - Or Menu → More Tools → Extensions
-
-3. **Enable Developer Mode**
-   - Toggle the switch in the top-right corner
-
-4. **Load the Extension**
-   - Click **"Load unpacked"**
-   - Select the `scrollstamp` folder
-   - The 📌 icon appears in your toolbar
-
-5. **Pin the Extension** (Recommended)
-   - Click the puzzle piece icon in Chrome toolbar
-   - Click the pin icon next to ScrollStamp
+1. Download or clone this repository
+2. Open Chrome and navigate to `chrome://extensions/`
+3. Enable **Developer mode** (toggle in top-right corner)
+4. Click **Load unpacked**
+5. Select the `scrollstamp` folder
+6. The 📌 icon should appear in your toolbar
 
 ---
 
-## 🎮 Usage
+## 📖 Usage
 
 ### Creating a Bookmark
 
-1. **Navigate** to any supported website or AI chat
-2. **Scroll** to the content you want to bookmark
-3. **Click** the floating 📌 button (bottom-right corner)
-4. **Confirmation** toast appears when saved
+1. Navigate to any webpage
+2. Scroll to the position or AI message you want to save
+3. Click the floating 📌 button (bottom-right corner)
+4. A toast notification confirms the bookmark
 
 ### Viewing Bookmarks
 
-1. **Click** the ScrollStamp icon in your browser toolbar
-2. **Browse** your saved bookmarks with previews
-3. **See** timestamps and platform indicators
+1. Click the ScrollStamp icon in your browser toolbar
+2. See all your bookmarks sorted by date
+3. The popup shows the current mode (AI platform name or "Scroll")
 
 ### Navigating to a Bookmark
 
-1. **Open** the extension popup
-2. **Click** any bookmark entry
-3. **Watch** as the page scrolls and highlights the content
+1. Open the popup
+2. Click on any bookmark
+3. The page scrolls to that position/message
+4. A highlight animation shows the exact location
 
-> **Note:** If you're on a different page, ScrollStamp will navigate to the correct URL first, then scroll to your bookmark.
+### Deleting Bookmarks
 
-### Managing Bookmarks
+- **Single**: Click the ✕ button on any bookmark
+- **All**: Click "Clear All" at the bottom of the popup
 
-| Action | How To |
-|--------|--------|
-| **Rename** | Click the ✏️ pencil icon → Edit title → Press Enter or click away |
-| **Delete One** | Click the 🗑️ trash icon on the bookmark |
-| **Delete All** | Click "Clear All" in the popup footer |
+---
 
-### Keyboard Shortcuts
+## 🎨 Visual Indicators
 
-| Shortcut | Action |
-|----------|--------|
-| `Enter` | Confirm title edit |
-| `Escape` | Cancel title edit |
+| Element | Meaning |
+|---------|---------|
+| 💬 | Message-based bookmark (AI chat) |
+| 📍 | Scroll-based bookmark (regular website) |
+| Purple badge | AI chat mode (shows platform name) |
+| Green badge | Scroll mode |
 
 ---
 
 ## 🔧 Technical Details
 
-### File Structure
-
-```
-scrollstamp/
-├── manifest.json      # Extension configuration & permissions
-├── content.js         # Core bookmarking logic (injected into pages)
-├── content.css        # Floating button & highlight styles
-├── popup.html         # Extension popup structure
-├── popup.js           # Popup interaction & bookmark management
-├── popup.css          # Popup styling
-├── icon.png           # Extension icon
-└── README.md          # This file
-```
-
 ### Storage Schema
 
-**Message-Based Bookmark (AI Chats)**
 ```javascript
+// Message-based bookmark (v2)
 {
-  id: "msg_1704067200000_3",      // Unique identifier
-  type: "message",                 // Bookmark type
-  url: "https://claude.ai/chat/...",
-  storageKey: "claude.ai/chat/abc123",
-  title: "Claude response about React",
-  preview: "Here's how you can implement...",
-  messageIndex: 3,                 // Position in conversation
-  textSnippet: "Here's how you can...",
-  platform: "claude",
-  timestamp: 1704067200000
+  id: "msg_0_abc123",
+  type: "message",
+  index: 0,
+  preview: "Here's how to implement...",
+  timestamp: 1704067200000,
+  url: "https://chatgpt.com/c/123",
+  platform: "chatgpt"
 }
-```
 
-**Scroll-Based Bookmark (Other Sites)**
-```javascript
+// Scroll-based bookmark (v1)
 {
-  id: "scroll_1704067200000",     // Unique identifier
-  type: "scroll",                  // Bookmark type
-  url: "https://example.com/article",
-  storageKey: "example.com/article",
-  title: "Article Section",
-  preview: "The content visible at...",
-  scrollPercentage: 45.5,         // % down the page
-  scrollY: 1250,                  // Pixel position
-  timestamp: 1704067200000
+  id: "scroll_45_xyz789",
+  type: "scroll",
+  scrollPercent: 45,
+  scrollY: 1250,
+  preview: "Section about advanced topics...",
+  pageTitle: "Documentation - MyApp",
+  timestamp: 1704067200000,
+  url: "https://example.com/docs",
+  platform: "web"
 }
 ```
 
@@ -218,171 +161,74 @@ scrollstamp/
 | `storage` | Save bookmarks locally |
 | `activeTab` | Access current tab for bookmarking |
 
-### Browser Compatibility
-
-| Browser | Support |
-|---------|---------|
-| Google Chrome | ✅ Full Support |
-| Microsoft Edge | ✅ Full Support (Chromium) |
-| Brave | ✅ Full Support |
-| Opera | ✅ Full Support |
-| Firefox | ⚠️ Requires manifest modifications |
-
 ---
 
-## 🐛 Troubleshooting
+## 📋 Version History
 
-### Common Issues
+### v2.1.0 (Current) — Unified Release
+- ✨ Combined v1 and v2 into single extension
+- 🔄 Automatic mode detection
+- 🌐 Works on all websites
+- 📍 Scroll-based fallback for non-AI sites
 
-<details>
-<summary><strong>Bookmark doesn't scroll to the right position</strong></summary>
+### v2.0.0 — Message-Based Bookmarking
+- 💬 AI message detection
+- 🎯 Precise message navigation
+- 🤖 Multi-platform support
 
-This can happen if:
-- saved bookmark working as a link and opening it on your current tab
-- The page content has changed significantly since bookmarking
-- The page uses dynamic/lazy loading
-- You're on a different conversation/thread
-
-**Solution:** For AI chats, try scrolling manually near the bookmark position. The extension will attempt multiple retries automatically.
-</details>
-
-<details>
-<summary><strong>Floating button doesn't appear</strong></summary>
-
-**Solutions:**
-1. Refresh the page
-2. ensure your cursor isnt on the website url when pressing a bookmark
-3. Check if you're on a supported platform
-4. Disable and re-enable the extension
-5. Check for conflicts with other extensions
-</details>
-
-<details>
-<summary><strong>"Extension context invalidated" error</strong></summary>
-
-This occurs when the extension is updated or reloaded while a page is open.
-
-**Solution:** Simply refresh the page. The extension handles this gracefully and will recover automatically.
-</details>
-
-<details>
-<summary><strong>Bookmarks not persisting</strong></summary>
-
-**Solutions:**
-1. Check Chrome storage isn't full
-2. Ensure you have permissions enabled
-3. Try uninstalling and reinstalling the extension
-</details>
+### v1.0.0 — Scroll Position Bookmarking
+- 📍 Scroll percentage tracking
+- 💾 Chrome storage integration
+- 🔖 Basic popup interface
 
 ---
 
 ## 🗺️ Roadmap
 
 ### v2.2.0 (Planned)
-- [ ] Bookmark folders & categories
-- [ ] Search within bookmarks
-- [ ] Export/import bookmarks (JSON)
-- [ ] Keyboard shortcut to create bookmark
-
-### v2.3.0 (Planned)
-- [ ] Sync bookmarks across devices
-- [ ] Custom bookmark labels & tags
-- [ ] Dark/light theme toggle
-- [ ] Bookmark sharing via links
+- 📁 Bookmark folders/categories
+- 🔍 Search within bookmarks
+- ⌨️ Keyboard shortcuts
+- 📤 Export/Import bookmarks
 
 ### v3.0.0 (Future)
-- [ ] Firefox & Safari support
-- [ ] AI-powered bookmark organization
-- [ ] Integration with note-taking apps
-- [ ] Browser sidebar view
-
----
-
-## 📋 Version History
-
-| Version | Date | Highlights |
-|---------|------|------------|
-| **v2.1.0** | 2025 | Robust error handling, cross-page navigation, editable titles, hostname display |
-| **v2.0.0** | 2024 | Message-based bookmarking for AI chats |
-| **v1.0.0** | 2024 | Initial release with scroll position bookmarking |
+- 🔄 Cross-device sync
+- 🏷️ Custom labels/tags
+- 📝 Notes on bookmarks
+- 🎨 Theme customization
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Here's how you can help:
+Contributions are welcome! Please:
 
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
-
-### Development Setup
-
-```bash
-# Clone your fork
-git clone https://github.com/YOUR_USERNAME/scrollstamp.git
-
-# Make changes to the code
-
-# Load unpacked extension in Chrome for testing
-# chrome://extensions/ → Load unpacked → Select folder
-```
-
----
-
-## ⭐ Support the Project
-
-If ScrollStamp has been helpful to you, please consider:
-
-<p align="center">
-  <a href="https://github.com/YOUR_USERNAME/scrollstamp">
-    <img src="https://img.shields.io/badge/⭐_Star_this_repo-yellow?style=for-the-badge" alt="Star this repo">
-  </a>
-</p>
-
-**Your star helps:**
-- 📈 Increase visibility for other users
-- 💪 Motivate continued development
-- 🌟 Show appreciation for the project
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test on multiple platforms
+5. Submit a pull request
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License** — feel free to use, modify, and distribute.
-
-```
-MIT License
-
-Copyright (c) 2024-2025 ScrollStamp Contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software.
-```
+MIT License — feel free to use, modify, and distribute.
 
 ---
 
-## 📞 Support
+## 💬 Support
 
-Having issues? We're here to help!
-
-| Channel | Link |
-|---------|------|
-| 🐛 Bug Reports | [Open an Issue](https://github.com/YOUR_USERNAME/scrollstamp/issues/new) |
-| 💡 Feature Requests | [Open an Issue](https://github.com/YOUR_USERNAME/scrollstamp/issues/new) |
-| 💬 Discussions | [GitHub Discussions](https://github.com/YOUR_USERNAME/scrollstamp/discussions) |
+- **Issues**: Report bugs via GitHub Issues
+- **Features**: Request features via GitHub Discussions
+- **Questions**: Open a Discussion thread
 
 ---
 
-<p align="center">
-  <strong>Made with ❤️ by Sathwik Perla for the AI chat community</strong>
-</p>
+<div align="center">
 
-<p align="center">
-  <sub>If you find ScrollStamp useful, don't forget to ⭐ star the repository!</sub>
-</p>
+Made with ❤️ for bookmarking enthusiasts
+
+**📌 ScrollStamp** — Never lose your place again
+
+</div>

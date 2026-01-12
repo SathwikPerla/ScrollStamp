@@ -1,8 +1,51 @@
+/* ===== ScrollStamp Basic Analytics (Privacy-safe) ===== */
+
+function getAnonUserId(cb) {
+  chrome.storage.local.get("scrollstamp_uid", (res) => {
+    if (res.scrollstamp_uid) return cb(res.scrollstamp_uid);
+
+    const uid = crypto.randomUUID();
+    chrome.storage.local.set({ scrollstamp_uid: uid }, () => cb(uid));
+  });
+}
+
+function trackPopupLoad() {
+  getAnonUserId((uid) => {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const month = today.slice(0, 7); // YYYY-MM
+
+    chrome.storage.local.get(
+      ["scrollstamp_dau", "scrollstamp_mau", "scrollstamp_opens"],
+      (res) => {
+        const dau = res.scrollstamp_dau || {};
+        const mau = res.scrollstamp_mau || {};
+        const opens = res.scrollstamp_opens || 0;
+
+        if (!dau[today]) dau[today] = [];
+        if (!dau[today].includes(uid)) dau[today].push(uid);
+
+        if (!mau[month]) mau[month] = [];
+        if (!mau[month].includes(uid)) mau[month].push(uid);
+
+        chrome.storage.local.set({
+          scrollstamp_dau: dau,
+          scrollstamp_mau: mau,
+          scrollstamp_opens: opens + 1,
+        });
+      }
+    );
+  });
+}
+
+
+/* ===== End Analytics ===== */
+
 // ScrollStamp - Unified Popup Script
 
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
+  trackPopupLoad();
   loadStamps();
   detectCurrentMode();
   document
@@ -275,3 +318,24 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+// ===== Simple Analytics Debug Helper =====
+window.analytics = function () {
+  chrome.storage.local.get(
+    ["scrollstamp_opens", "scrollstamp_dau", "scrollstamp_mau"],
+    (res) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const month = today.slice(0, 7);
+
+      const totalOpens = res.scrollstamp_opens || 0;
+      const dau = res.scrollstamp_dau?.[today]?.length || 0;
+      const mau = res.scrollstamp_mau?.[month]?.length || 0;
+
+      console.log("📊 ScrollStamp Analytics");
+      console.log("———————————————");
+      console.log("Total Opens:", totalOpens);
+      console.log("DAU (Today):", dau);
+      console.log("MAU (This Month):", mau);
+    }
+  );
+};

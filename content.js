@@ -348,24 +348,47 @@
     return `scrollstamp_${btoa(window.location.pathname).substring(0, 20)}`;
   }
 
+
+  function isContextAlive() {
+    return !!chrome?.runtime?.id;
+  }
+
   async function saveStamp(stamp) {
     const storageKey = getStorageKey();
 
-    return new Promise((resolve) => {
-      chrome.storage.local.get([storageKey], (result) => {
-        const stamps = result[storageKey] || [];
-        const exists = stamps.some((s) => s.id === stamp.id);
-        if (!exists) {
-          stamps.push(stamp);
-          chrome.storage.local.set({ [storageKey]: stamps }, () => {
-            resolve(true);
-          });
-        } else {
-          resolve(false);
-        }
+    if (!isContextAlive()) return false;
+
+    try {
+      return await new Promise((resolve) => {
+        chrome.storage.local.get([storageKey], (result) => {
+          if (chrome.runtime.lastError || !isContextAlive()) {
+            resolve(false);
+            return;
+          }
+
+          const stamps = result[storageKey] || [];
+          const exists = stamps.some((s) => s.id === stamp.id);
+
+          if (!exists) {
+            stamps.push(stamp);
+
+            chrome.storage.local.set({ [storageKey]: stamps }, () => {
+              if (chrome.runtime.lastError || !isContextAlive()) {
+                resolve(false);
+              } else {
+                resolve(true);
+              }
+            });
+          } else {
+            resolve(false);
+          }
+        });
       });
-    });
+    } catch {
+      return false;
+    }
   }
+
 
   function smoothScrollTo(element) {
     element.scrollIntoView({
