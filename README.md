@@ -1,4 +1,4 @@
-# 📌 ScrollStamp
+# 📌 ScrollStamp v2.1
 
 > Smart bookmarking for the web — Message-based for AI chats, scroll-based for everything else.
 
