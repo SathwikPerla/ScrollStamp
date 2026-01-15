@@ -317,7 +317,7 @@
     }
 
     // Try scrollY first for exact position
-    if (stamp.scrollY !== undefined && stamp.scrollY > 0) {
+    if (stamp.scrollY !== undefined) {
       window.scrollTo({
         top: stamp.scrollY,
         behavior: "smooth",
@@ -326,7 +326,7 @@
     }
 
     // Fallback to percentage-based scroll
-    if (stamp.scrollPercent !== undefined && stamp.scrollPercent > 0) {
+    if (stamp.scrollPercent !== undefined) {
       const scrollHeight =
         document.documentElement.scrollHeight - window.innerHeight;
       const targetY = (stamp.scrollPercent / 100) * scrollHeight;
@@ -433,29 +433,54 @@
       ? "Bookmark this PDF position"
       : "Bookmark this scroll position";
 
+    // Replace lines 436-475 in content.js with:
+
     floatingBtn.addEventListener("click", async () => {
       let stamp;
       let saved;
+      let defaultPreview;
 
       if (isAIChat) {
         // V2: Message-based bookmarking
         const nearest = findNearestAssistantMessage();
-        if (nearest) {
-          stamp = createMessageStamp(nearest);
-          saved = await saveStamp(stamp);
-
-          if (saved) {
-            showToast("Message bookmarked!");
-          } else {
-            showToast("Already bookmarked");
-          }
-        } else {
+        if (!nearest) {
           showToast("No AI message found nearby");
           return;
+        }
+
+        stamp = createMessageStamp(nearest);
+        defaultPreview = stamp.preview;
+
+        // Prompt for custom name
+        const customName = prompt("Enter bookmark name:", defaultPreview);
+
+        // If user clicked Cancel, customName is null - use default
+        // If user cleared the input, customName is "" - also use default
+        if (customName !== null && customName.trim() !== "") {
+          stamp.title = customName.trim();
+        }
+
+        saved = await saveStamp(stamp);
+
+        if (saved) {
+          showToast("Message bookmarked!");
+        } else {
+          showToast("Already bookmarked");
         }
       } else {
         // V1: Scroll-based bookmarking
         stamp = createScrollStamp();
+        defaultPreview = stamp.preview || `${stamp.scrollPercent}% scrolled`;
+
+        // Prompt for custom name
+        const customName = prompt("Enter bookmark name:", defaultPreview);
+
+        // If user clicked Cancel, customName is null - use default
+        // If user cleared the input, customName is "" - also use default
+        if (customName !== null && customName.trim() !== "") {
+          stamp.title = customName.trim();
+        }
+
         saved = await saveStamp(stamp);
 
         if (saved) {
