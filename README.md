@@ -1,4 +1,4 @@
-# 📌 ScrollStamp v2.1
+# 📌 ScrollStamp
 
 > Smart bookmarking for the web — Message-based for AI chats, scroll-based for everything else.
 
@@ -227,7 +227,7 @@ MIT License — feel free to use, modify, and distribute.
 
 <div align="center">
 
-Made for bookmarking enthusiasts
+Made with ❤️ for bookmarking enthusiasts
 
 **📌 ScrollStamp** — Never lose your place again
 

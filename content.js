@@ -80,7 +80,44 @@
     if (!currentPlatform || !AI_PLATFORM_SELECTORS[currentPlatform]) return [];
     const selector = AI_PLATFORM_SELECTORS[currentPlatform].assistant;
     if (!selector) return [];
-    return Array.from(document.querySelectorAll(selector));
+
+    let messages = Array.from(document.querySelectorAll(selector));
+
+    // Fallback for Claude and Grok when strict selectors fail
+    if (
+      messages.length === 0 &&
+      (currentPlatform === "claude" || currentPlatform === "grok")
+    ) {
+      const fallbackSelectors = [
+        "article",
+        "div[data-testid*='conversation']",
+        "div[data-testid*='message']",
+        'div[class*="message"]',
+        'div[class*="response"]',
+        'div[class*="assistant"]',
+        'div[class*="answer"]',
+      ];
+      const candidates = new Set();
+      for (const sel of fallbackSelectors) {
+        document.querySelectorAll(sel).forEach((el) => candidates.add(el));
+      }
+      // Filter: check element text or nested content nodes for >=30 chars
+      messages = Array.from(candidates).filter((el) => {
+        let text = el.textContent || "";
+        const deepNode = el.querySelector(
+          ".prose, .markdown, [class*='content'], [class*='text']",
+        );
+        if (deepNode) {
+          text = deepNode.textContent || "";
+        }
+        text = text.trim();
+        if (text.length < 30) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.height > 20 && rect.width > 50;
+      });
+    }
+
+    return messages;
   }
 
   function findNearestAssistantMessage() {
@@ -209,7 +246,7 @@
         document.body.scrollHeight || 0,
         document.documentElement.scrollHeight || 0,
         document.body.offsetHeight || 0,
-        document.documentElement.offsetHeight || 0
+        document.documentElement.offsetHeight || 0,
       );
       const scrollHeight = docHeight - window.innerHeight;
 
@@ -239,7 +276,7 @@
     const viewportCenter = window.innerHeight / 2;
     const elements = document.elementsFromPoint(
       window.innerWidth / 2,
-      viewportCenter
+      viewportCenter,
     );
 
     for (const el of elements) {
@@ -317,7 +354,7 @@
     }
 
     // Try scrollY first for exact position
-    if (stamp.scrollY !== undefined) {
+    if (stamp.scrollY !== undefined && stamp.scrollY > 0) {
       window.scrollTo({
         top: stamp.scrollY,
         behavior: "smooth",
@@ -326,7 +363,7 @@
     }
 
     // Fallback to percentage-based scroll
-    if (stamp.scrollPercent !== undefined) {
+    if (stamp.scrollPercent !== undefined && stamp.scrollPercent > 0) {
       const scrollHeight =
         document.documentElement.scrollHeight - window.innerHeight;
       const targetY = (stamp.scrollPercent / 100) * scrollHeight;
@@ -348,7 +385,6 @@
     return `scrollstamp_${btoa(window.location.pathname).substring(0, 20)}`;
   }
 
-
   function isContextAlive() {
     return !!chrome?.runtime?.id;
   }
@@ -356,39 +392,47 @@
   async function saveStamp(stamp) {
     const storageKey = getStorageKey();
 
-    if (!isContextAlive()) return false;
+    if (!isContextAlive()) return { status: "error", reason: "context_dead" };
 
-    try {
-      return await new Promise((resolve) => {
+    async function tryRead(retries) {
+      return new Promise((resolve) => {
         chrome.storage.local.get([storageKey], (result) => {
           if (chrome.runtime.lastError || !isContextAlive()) {
-            resolve(false);
+            if (retries > 0) {
+              setTimeout(() => resolve(tryRead(retries - 1)), 200);
+            } else {
+              resolve({ status: "error", reason: "storage_read_failed" });
+            }
             return;
           }
+          resolve({ status: "ok", stamps: result[storageKey] || [] });
+        });
+      });
+    }
 
-          const stamps = result[storageKey] || [];
-          const exists = stamps.some((s) => s.id === stamp.id);
+    try {
+      const readResult = await tryRead(1);
+      if (readResult.status === "error") return readResult;
 
-          if (!exists) {
-            stamps.push(stamp);
+      const stamps = readResult.stamps;
+      const exists = stamps.some((s) => s.id === stamp.id);
+      if (exists) return { status: "duplicate" };
 
-            chrome.storage.local.set({ [storageKey]: stamps }, () => {
-              if (chrome.runtime.lastError || !isContextAlive()) {
-                resolve(false);
-              } else {
-                resolve(true);
-              }
-            });
+      stamps.push(stamp);
+
+      return await new Promise((resolve) => {
+        chrome.storage.local.set({ [storageKey]: stamps }, () => {
+          if (chrome.runtime.lastError || !isContextAlive()) {
+            resolve({ status: "error", reason: "storage_write_failed" });
           } else {
-            resolve(false);
+            resolve({ status: "saved" });
           }
         });
       });
     } catch {
-      return false;
+      return { status: "error", reason: "exception" };
     }
   }
-
 
   function smoothScrollTo(element) {
     element.scrollIntoView({
@@ -422,7 +466,10 @@
   // ============================================
 
   function createFloatingButton() {
-    if (floatingBtn) return;
+    if (floatingBtn && document.body.contains(floatingBtn)) return;
+
+    const existingBtn = document.getElementById("scrollstamp-pin");
+    if (existingBtn) existingBtn.remove();
 
     floatingBtn = document.createElement("div");
     floatingBtn.id = "scrollstamp-pin";
@@ -430,15 +477,11 @@
     floatingBtn.title = isAIChat
       ? "Bookmark this AI message"
       : isPDF
-      ? "Bookmark this PDF position"
-      : "Bookmark this scroll position";
-
-    // Replace lines 436-475 in content.js with:
+        ? "Bookmark this PDF position"
+        : "Bookmark this scroll position";
 
     floatingBtn.addEventListener("click", async () => {
       let stamp;
-      let saved;
-      let defaultPreview;
 
       if (isAIChat) {
         // V2: Message-based bookmarking
@@ -447,55 +490,37 @@
           showToast("No AI message found nearby");
           return;
         }
-
         stamp = createMessageStamp(nearest);
-        defaultPreview = stamp.preview;
-
-        // Prompt for custom name
-        const customName = prompt("Enter bookmark name:", defaultPreview);
-
-        // If user clicked Cancel, customName is null - use default
-        // If user cleared the input, customName is "" - also use default
-        if (customName !== null && customName.trim() !== "") {
-          stamp.title = customName.trim();
-        }
-
-        saved = await saveStamp(stamp);
-
-        if (saved) {
-          showToast("Message bookmarked!");
-        } else {
-          showToast("Already bookmarked");
-        }
       } else {
         // V1: Scroll-based bookmarking
         stamp = createScrollStamp();
-        defaultPreview = stamp.preview || `${stamp.scrollPercent}% scrolled`;
-
-        // Prompt for custom name
-        const customName = prompt("Enter bookmark name:", defaultPreview);
-
-        // If user clicked Cancel, customName is null - use default
-        // If user cleared the input, customName is "" - also use default
-        if (customName !== null && customName.trim() !== "") {
-          stamp.title = customName.trim();
-        }
-
-        saved = await saveStamp(stamp);
-
-        if (saved) {
-          showToast(`Position bookmarked (${stamp.scrollPercent}%)`);
-        } else {
-          showToast("Already bookmarked");
-        }
       }
 
-      if (saved) {
+      // Ask user for a bookmark name before saving
+      const defaultName = stamp.preview || stamp.pageTitle || "Bookmark";
+      const userTitle = prompt("Name this bookmark:", defaultName);
+
+      // If user cancels the prompt, don't save
+      if (userTitle === null) return;
+
+      stamp.title = userTitle.trim() || defaultName;
+
+      const result = await saveStamp(stamp);
+
+      if (result.status === "saved") {
+        const msg = isAIChat
+          ? "Message bookmarked!"
+          : `Position bookmarked (${stamp.scrollPercent}%)`;
+        showToast(msg);
         floatingBtn.classList.add("scrollstamp-success");
         setTimeout(
           () => floatingBtn.classList.remove("scrollstamp-success"),
-          500
+          500,
         );
+      } else if (result.status === "duplicate") {
+        showToast("Already bookmarked");
+      } else {
+        showToast("Failed to save — try again");
       }
     });
 
@@ -531,7 +556,7 @@
       const storageKey = getStorageKey();
       chrome.storage.local.get([storageKey], (result) => {
         const stamps = (result[storageKey] || []).filter(
-          (s) => s.id !== request.stampId
+          (s) => s.id !== request.stampId,
         );
         chrome.storage.local.set({ [storageKey]: stamps }, () => {
           sendResponse({ success: true });
@@ -577,8 +602,8 @@
     const mode = isAIChat
       ? `AI Chat (${currentPlatform})`
       : isPDF
-      ? "PDF Mode"
-      : "Scroll Mode";
+        ? "PDF Mode"
+        : "Scroll Mode";
     console.log(`ScrollStamp initialized - ${mode}`);
   }
 

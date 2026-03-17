@@ -32,25 +32,67 @@ function trackPopupLoad() {
           scrollstamp_mau: mau,
           scrollstamp_opens: opens + 1,
         });
-      }
+      },
     );
   });
 }
-
 
 /* ===== End Analytics ===== */
 
 // ScrollStamp - Unified Popup Script
 
+// Platform logo mapping (local icons)
+const PLATFORM_LOGOS = {
+  chatgpt: "icons/chatgpt.png",
+  claude: "icons/claude.png",
+  gemini: "icons/gemini.png",
+  deepseek: "icons/deepseek.png",
+  perplexity: "icons/perplexity.png",
+  grok: "icons/grok.png",
+};
+
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   trackPopupLoad();
+  await ensureContentScriptReady();
   loadStamps();
   detectCurrentMode();
   document
     .getElementById("clear-all")
     .addEventListener("click", clearAllStamps);
+}
+
+async function ensureContentScriptReady() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+  if (!tab?.id || !tab.url || !/^https?:/i.test(tab.url)) return;
+
+  const canTalkToContentScript = await new Promise((resolve) => {
+    chrome.tabs.sendMessage(tab.id, { action: "getMode" }, (response) => {
+      resolve(!chrome.runtime.lastError && !!response);
+    });
+  });
+
+  if (canTalkToContentScript) return;
+
+  try {
+    await chrome.scripting.insertCSS({
+      target: { tabId: tab.id },
+      files: ["content.css"],
+    });
+  } catch (_) {
+    // Ignore: CSS may already exist or be blocked on restricted pages
+  }
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["content.js"],
+    });
+  } catch (_) {
+    // Ignore: restricted pages cannot run content scripts
+  }
 }
 
 async function detectCurrentMode() {
@@ -136,13 +178,22 @@ function createStampElement(stamp) {
   const timeAgo = formatTimeAgo(stamp.timestamp);
   const isMessage = stamp.type === "message";
   const isPdf = stamp.type === "pdf";
-  const icon = isMessage ? "💬" : isPdf ? "📄" : "📍";
   const typeClass = isMessage ? "message" : isPdf ? "pdf" : "scroll";
   const typeLabel = isMessage
     ? stamp.platform
     : isPdf
-    ? "PDF"
-    : `${stamp.scrollPercent || 0}%`;
+      ? "PDF"
+      : `${stamp.scrollPercent || 0}%`;
+
+  // Determine icon: use platform logo for AI messages, emoji for others
+  let iconHtml;
+  if (isMessage && stamp.platform && PLATFORM_LOGOS[stamp.platform]) {
+    const iconPath = chrome.runtime.getURL(PLATFORM_LOGOS[stamp.platform]);
+    iconHtml = `<img src="${iconPath}" alt="${stamp.platform}" class="stamp-platform-logo">`;
+  } else {
+    const emoji = isMessage ? "💬" : isPdf ? "📄" : "📍";
+    iconHtml = emoji;
+  }
 
   // Get display title - use custom title if set, otherwise preview
   let displayTitle = stamp.title || stamp.preview || "No preview";
@@ -163,11 +214,11 @@ function createStampElement(stamp) {
   const shortHostname = hostname.replace(/^www\./, "").substring(0, 25);
 
   li.innerHTML = `
-    <span class="stamp-icon">${icon}</span>
+    <span class="stamp-icon">${iconHtml}</span>
     <div class="stamp-content">
       <div class="stamp-title-row">
         <input type="text" class="stamp-title-input" value="${escapeHtml(
-          displayTitle
+          displayTitle,
         )}" placeholder="Add title..." title="Click to edit title" />
         <button class="stamp-edit-btn" title="Edit title">✏️</button>
       </div>
@@ -280,7 +331,7 @@ async function scrollToStamp(stamp) {
 async function deleteStamp(stamp) {
   chrome.storage.local.get([stamp.storageKey], (result) => {
     const stamps = (result[stamp.storageKey] || []).filter(
-      (s) => s.id !== stamp.id
+      (s) => s.id !== stamp.id,
     );
 
     if (stamps.length === 0) {
@@ -296,7 +347,7 @@ function clearAllStamps() {
 
   chrome.storage.local.get(null, (items) => {
     const keysToRemove = Object.keys(items).filter((key) =>
-      key.startsWith("scrollstamp_")
+      key.startsWith("scrollstamp_"),
     );
     chrome.storage.local.remove(keysToRemove, loadStamps);
   });
@@ -336,6 +387,6 @@ window.analytics = function () {
       console.log("Total Opens:", totalOpens);
       console.log("DAU (Today):", dau);
       console.log("MAU (This Month):", mau);
-    }
+    },
   );
 };

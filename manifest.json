@@ -3,11 +3,14 @@
   "name": "ScrollStamp",
   "version": "2.1.0",
   "description": "Smart bookmarking - Message-based for AI chats, scroll-based for everything else",
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "scripting"],
   "icons": {
     "16": "icon.png",
     "48": "icon.png",
     "128": "icon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
