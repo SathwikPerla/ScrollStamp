@@ -21,7 +21,7 @@ Supports on every website except message based LLm's like chat gpt grok for thos
 
 ## ✨ Features
 
-- **📍 Scroll Position Bookmarking** — Save your exact scroll position as a percentage
+- **  Scroll Position Bookmarking** — Save your exact scroll position as a percentage
 - **💾 Persistent Storage** — Bookmarks are saved locally and persist across browser sessions
 - **🔄 Instant Restoration** — Click any bookmark to scroll back to that exact position
 - **🌐 Multi-Platform Support** — Works seamlessly across all major AI chat platforms
@@ -259,5 +259,5 @@ SOFTWARE.
 </p>
 
 <p align="center">
-  Made with ❤️ by Sathwik Perla for the AI chat community
+  Made by Sathwik Perla for the AI chat community
 </p>
