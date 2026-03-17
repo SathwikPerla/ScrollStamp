@@ -227,7 +227,7 @@ MIT License — feel free to use, modify, and distribute.
 
 <div align="center">
 
-Made with ❤️ for bookmarking enthusiasts
+Made for bookmarking enthusiasts
 
 **📌 ScrollStamp** — Never lose your place again
 
