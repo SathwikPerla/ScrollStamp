@@ -1,0 +1,21 @@
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Chrome extension packaging
+*.zip
+*.crx
+*.pem
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Private Documents
+PROJECT_INTERVIEW_GUIDE.md
+README.md

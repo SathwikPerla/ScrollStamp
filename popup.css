@@ -1,0 +1,398 @@
+/* ScrollStamp — Popup Styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 360px;
+  min-height: 200px;
+  max-height: 520px;
+  background: #0d0d1a;
+  color: #d8d8f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+}
+
+.popup-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 520px;
+}
+
+/* ─── Header ──────────────────────────────────── */
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #191930 0%, #141428 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-logo {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.header-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.version {
+  font-size: 10px;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.12);
+  padding: 2px 7px;
+  border-radius: 8px;
+  font-weight: 500;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.mode-badge {
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.mode-badge.ai-mode {
+  background: rgba(139, 92, 246, 0.16);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+}
+
+.mode-badge.scroll-mode {
+  background: rgba(34, 197, 94, 0.13);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.24);
+}
+
+.mode-badge.pdf-mode {
+  background: rgba(251, 146, 60, 0.13);
+  color: #fb923c;
+  border: 1px solid rgba(251, 146, 60, 0.24);
+}
+
+/* ─── Stamps Container ────────────────────────── */
+#stamps-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  min-height: 0;
+}
+
+/* ─── Empty State ─────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  gap: 8px;
+}
+
+.empty-icon {
+  font-size: 30px;
+  opacity: 0.3;
+  margin-bottom: 4px;
+}
+
+.empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #5a5a7a;
+}
+
+.empty-hint {
+  font-size: 12px;
+  color: #42425a;
+  line-height: 1.55;
+  max-width: 220px;
+}
+
+/* ─── Stamp List ──────────────────────────────── */
+#stamps-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.stamp-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #14142a;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-left-width: 2px;
+  position: relative;
+}
+
+.stamp-item:hover {
+  background: #1c1c38;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Type accent border */
+.stamp-item.type-message   { border-left-color: rgba(139, 92, 246, 0.55); }
+.stamp-item.type-selection { border-left-color: rgba(99, 102, 241, 0.55); }
+.stamp-item.type-scroll    { border-left-color: rgba(34, 197, 94, 0.45); }
+.stamp-item.type-pdf       { border-left-color: rgba(251, 146, 60, 0.45); }
+
+.stamp-icon {
+  font-size: 17px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+}
+
+.stamp-platform-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.stamp-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.stamp-title-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+.stamp-title-input {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #cccce8;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 3px 5px;
+  line-height: 1.35;
+  font-family: inherit;
+  min-width: 0;
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.stamp-title-input:not([readonly]) {
+  cursor: text;
+  pointer-events: auto;
+  user-select: text;
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+  color: #ffffff;
+}
+
+.stamp-title-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.11);
+  color: #ffffff;
+}
+
+.stamp-edit-btn {
+  padding: 2px 5px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+  border-radius: 4px;
+  line-height: 1.5;
+}
+
+.stamp-item:hover .stamp-edit-btn {
+  opacity: 0.45;
+}
+
+.stamp-edit-btn:hover {
+  opacity: 1 !important;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ─── Stamp Meta ──────────────────────────────── */
+.stamp-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #52527a;
+  flex-wrap: wrap;
+}
+
+.stamp-type {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.stamp-type.message {
+  background: rgba(139, 92, 246, 0.14);
+  color: #a78bfa;
+}
+
+.stamp-type.scroll {
+  background: rgba(34, 197, 94, 0.11);
+  color: #4ade80;
+}
+
+.stamp-type.pdf {
+  background: rgba(251, 146, 60, 0.11);
+  color: #fb923c;
+}
+
+.stamp-type.selection {
+  background: rgba(99, 102, 241, 0.11);
+  color: #818cf8;
+}
+
+.stamp-hostname {
+  color: #5a5af0;
+  font-size: 10px;
+  max-width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.8;
+}
+
+.stamp-time {
+  color: #42425a;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* ─── Delete Button ───────────────────────────── */
+.stamp-delete {
+  padding: 3px 7px;
+  background: transparent;
+  border: none;
+  color: #3a2a2a;
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 5px;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  line-height: 1.3;
+  margin-left: 2px;
+}
+
+.stamp-item:hover .stamp-delete {
+  opacity: 1;
+  color: #6a4a4a;
+}
+
+.stamp-delete:hover {
+  background: rgba(220, 38, 38, 0.16);
+  color: #ef4444;
+}
+
+/* ─── Footer ──────────────────────────────────── */
+.popup-footer {
+  padding: 9px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  background: #0d0d1a;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.btn-clear {
+  flex: 1;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 7px;
+  color: #5a5a7a;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn-clear:hover {
+  background: rgba(220, 38, 38, 0.07);
+  border-color: rgba(220, 38, 38, 0.28);
+  color: #ef4444;
+}
+
+.github-link {
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 7px;
+  color: #7a7a5a;
+  font-size: 12px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.github-link:hover {
+  background: rgba(251, 191, 36, 0.07);
+  border-color: rgba(251, 191, 36, 0.28);
+  color: #fbbf24;
+}
+
+/* ─── Scrollbar ───────────────────────────────── */
+#stamps-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+#stamps-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#stamps-container::-webkit-scrollbar-thumb {
+  background: #252540;
+  border-radius: 2px;
+}
+
+#stamps-container::-webkit-scrollbar-thumb:hover {
+  background: #353560;
+}
