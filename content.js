@@ -278,28 +278,42 @@
       return false;
     }
 
-    const jump = () => {
-      const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
-      container.scrollTop = hasRatio
-        ? stamp.containerScrollRatio * maxScroll
-        : Math.min(stamp.containerScrollY, maxScroll);
-    };
-
+    let lastScrollTop = -1;
+    let stableCount = 0;
     let tries = 0;
+    const MAX_TRIES = 40; // Allow sufficient time for long virtualized pages to load
+
     const retry = () => {
       tries++;
-      if (resolve()) {
+      const currentTarget = resolve();
+      if (currentTarget) {
         convergeScroll(resolve, desiredTop, highlightArrival);
         return;
       }
-      if (tries < 10) {
-        jump(); // recompute against the now-taller scrollHeight as content streams in
-        setTimeout(retry, 220);
+
+      const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+      const destY = hasRatio
+        ? stamp.containerScrollRatio * maxScroll
+        : Math.min(stamp.containerScrollY, maxScroll);
+
+      container.scrollTop = destY;
+
+      // Track if scroll position has stabilized (meaning no new virtual elements are loading)
+      if (Math.abs(container.scrollTop - lastScrollTop) < 5) {
+        stableCount++;
+      } else {
+        stableCount = 0;
+      }
+      lastScrollTop = container.scrollTop;
+
+      // Keep driving the scroll container if target isn't found, 
+      // max retries aren't met, and new content is still loading.
+      if (tries < MAX_TRIES && stableCount < 6) {
+        setTimeout(retry, 140);
       }
     };
 
-    jump();
-    setTimeout(retry, 220);
+    retry();
     return true;
   }
 

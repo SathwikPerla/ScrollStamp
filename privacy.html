@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - ScrollStamp Chrome Extension</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #eff6ff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --bg-page: #f8fafc;
+            --bg-card: #ffffff;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 24px 0;
+        }
+
+        .logo-container {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 64px;
+            height: 64px;
+            background-color: var(--primary-light);
+            border-radius: 16px;
+            margin-bottom: 16px;
+            color: var(--primary);
+        }
+
+        .logo-container svg {
+            width: 36px;
+            height: 36px;
+        }
+
+        h1 {
+            font-size: 2.25rem;
+            font-weight: 800;
+            color: var(--text-main);
+            letter-spacing: -0.025em;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .meta {
+            display: inline-flex;
+            gap: 16px;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            background-color: var(--bg-card);
+            padding: 6px 16px;
+            border-radius: 9999px;
+            border: 1px solid var(--border);
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+            padding: 48px;
+            margin-bottom: 32px;
+        }
+
+        section {
+            margin-bottom: 40px;
+        }
+
+        section:last-of-type {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h2::before {
+            content: "";
+            display: inline-block;
+            width: 4px;
+            height: 24px;
+            background-color: var(--primary);
+            border-radius: 2px;
+        }
+
+        p {
+            margin-bottom: 16px;
+            color: var(--text-main);
+            font-size: 1.05rem;
+        }
+
+        p:last-child {
+            margin-bottom: 0;
+        }
+
+        ul {
+            list-style-type: none;
+            margin-bottom: 20px;
+            padding-left: 4px;
+        }
+
+        li {
+            position: relative;
+            padding-left: 28px;
+            margin-bottom: 12px;
+            font-size: 1.05rem;
+        }
+
+        li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 1.1rem;
+            line-height: 1.2;
+        }
+
+        /* Callout Box styles */
+        .callout {
+            background-color: var(--primary-light);
+            border-left: 4px solid var(--primary);
+            padding: 20px;
+            border-radius: 0 12px 12px 0;
+            margin-bottom: 24px;
+        }
+
+        .callout p {
+            color: var(--primary-dark);
+            font-weight: 500;
+        }
+
+        .grid-permissions {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+            margin-top: 16px;
+            margin-bottom: 24px;
+        }
+
+        @media (min-width: 640px) {
+            .grid-permissions {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .permission-card {
+            background-color: var(--bg-page);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .permission-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow);
+        }
+
+        .permission-name {
+            font-weight: 700;
+            font-family: monospace;
+            color: var(--primary-dark);
+            font-size: 1rem;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .permission-desc {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        .contact-info {
+            background-color: var(--bg-page);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 16px;
+        }
+
+        .contact-info p {
+            margin-bottom: 8px;
+        }
+
+        .contact-info p:last-child {
+            margin-bottom: 0;
+        }
+
+        .contact-label {
+            font-weight: 600;
+            color: var(--text-muted);
+            display: inline-block;
+            width: 140px;
+        }
+
+        .contact-value {
+            color: var(--text-main);
+            font-weight: 500;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+
+        a:hover {
+            color: var(--primary-dark);
+            text-decoration: underline;
+        }
+
+        footer {
+            text-align: center;
+            padding: 24px 0;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            border-top: 1px solid var(--border);
+        }
+
+        @media (max-width: 768px) {
+            .card {
+                padding: 32px 24px;
+            }
+            
+            h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="logo-container">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v6m-3-3h6" />
+            </svg>
+        </div>
+        <h1>ScrollStamp Privacy Policy</h1>
+        <p class="subtitle">Privacy Policy for the ScrollStamp Chrome Extension</p>
+        <div class="meta">
+            <span><strong>Extension Version:</strong> 2.1 Hybrid 6</span>
+            <span><strong>Effective Date:</strong> July 15, 2026</span>
+        </div>
+    </header>
+
+    <main class="card">
+        <!-- 1. Introduction -->
+        <section id="introduction">
+            <h2>Introduction</h2>
+            <p>Welcome to ScrollStamp! We are committed to protecting your privacy. This Privacy Policy details how <strong>ScrollStamp</strong> ("we", "our", or "the extension") handles user data. ScrollStamp is a productivity tool that enables users to bookmark and instantly jump back to exact scroll positions of prompts, responses, or text on AI chat platforms (including ChatGPT, Claude, Gemini, Grok, DeepSeek, and Perplexity) and regular webpages.</p>
+        </section>
+
+        <!-- 2. Information We Collect -->
+        <section id="information-collected">
+            <h2>Information We Collect</h2>
+            <div class="callout">
+                <p>ScrollStamp does not collect, transmit, or store any of your personal data on external servers. All operations are strictly local to your device.</p>
+            </div>
+            <ul>
+                <li><strong>No User Accounts:</strong> You do not need to create an account or sign in to use ScrollStamp.</li>
+                <li><strong>No Personal Information:</strong> We do not collect names, email addresses, phone numbers, location data, or payment information.</li>
+                <li><strong>No Passwords or Sensitive Data:</strong> We do not collect, read, or process passwords, payment methods, or sensitive personal data.</li>
+                <li><strong>No Browsing History:</strong> The extension does not track or store your general web browsing history.</li>
+                <li><strong>Local Selected Text:</strong> To identify the exact scroll location of a bookmark, ScrollStamp reads small fragments of webpage text surrounding your selected element. This text is processed exclusively on your local machine to calculate the DOM position.</li>
+            </ul>
+        </section>
+
+        <!-- 3. How Information Is Used -->
+        <section id="how-information-is-used">
+            <h2>How Information Is Used</h2>
+            <p>Any data captured by the extension—specifically your saved scroll positions, bookmark labels, and page anchors—is used solely to facilitate the bookmarking functionality. This data is handled in the following manner:</p>
+            <ul>
+                <li>To calculate the precise location on the page to scroll back to when you click a saved bookmark.</li>
+                <li>To display your saved bookmarks in the extension's popup interface.</li>
+                <li>No text fragments, bookmark details, or page content are ever sent to external servers or remote locations.</li>
+            </ul>
+        </section>
+
+        <!-- 4. Data Storage -->
+        <section id="data-storage">
+            <h2>Data Storage</h2>
+            <p>All ScrollStamp bookmarks and extension preferences are stored locally on your device using Chrome's secure storage APIs (<code>chrome.storage.local</code> or <code>chrome.storage.sync</code>). This ensures that:</p>
+            <ul>
+                <li>Your configuration settings and bookmarks remain on your system.</li>
+                <li>No external databases, servers, or cloud storage platforms are used.</li>
+                <li>If you uninstall the extension, all locally stored bookmarks and preferences are permanently deleted from your browser automatically.</li>
+            </ul>
+        </section>
+
+        <!-- 5. Permissions Used -->
+        <section id="permissions">
+            <h2>Permissions Used</h2>
+            <p>ScrollStamp requests only the minimal set of browser permissions necessary to perform its core functions. Here is how each permission is used:</p>
+            
+            <div class="grid-permissions">
+                <div class="permission-card">
+                    <span class="permission-name">storage</span>
+                    <span class="permission-desc">Used to save your bookmark settings, coordinates, and preferences locally inside the browser.</span>
+                </div>
+                <div class="permission-card">
+                    <span class="permission-name">activeTab</span>
+                    <span class="permission-desc">Allows the extension to read and scroll the current active tab only when you interact with it.</span>
+                </div>
+                <div class="permission-card">
+                    <span class="permission-name">scripting</span>
+                    <span class="permission-desc">Used to execute content scripts that accurately identify target text blocks and scroll the window to them.</span>
+                </div>
+                <div class="permission-card">
+                    <span class="permission-name">Host Permissions</span>
+                    <span class="permission-desc">Allows the extension's scripts to run on specific AI chat platforms and web pages to manage bookmark anchors.</span>
+                </div>
+            </div>
+            <p>These permissions are requested strictly to provide the extension's core bookmarking functionality.</p>
+        </section>
+
+        <!-- 6. Third-Party Services -->
+        <section id="third-party-services">
+            <h2>Third-Party Services</h2>
+            <p>We do not integrate any third-party services, analytics APIs, advertising networks, or tracking SDKs. Your usage of ScrollStamp is entirely private and unmonitored.</p>
+        </section>
+
+        <!-- 7. Data Sharing -->
+        <section id="data-sharing">
+            <h2>Data Sharing</h2>
+            <p>Because we do not collect or store your data, it is impossible for us to share, sell, distribute, or rent your data to third parties, advertising companies, or any other entities.</p>
+        </section>
+
+        <!-- 8. Security -->
+        <section id="security">
+            <h2>Security</h2>
+            <p>We prioritize the security of your browsing environment. ScrollStamp adheres strictly to Chrome Web Store security guidelines:</p>
+            <ul>
+                <li>The extension does not run, load, or execute any remotely hosted code.</li>
+                <li>All extension code executes completely within your local browser sandbox.</li>
+                <li>By leveraging standard browser APIs, the extension prevents unauthorized data exfiltration.</li>
+            </ul>
+        </section>
+
+        <!-- 9. Children's Privacy -->
+        <section id="childrens-privacy">
+            <h2>Children's Privacy</h2>
+            <p>ScrollStamp does not collect any personal data or transmit information from its users. Consequently, the extension is fully compliant with children's privacy regulations, including COPPA, and is safe for users of all ages.</p>
+        </section>
+
+        <!-- 10. Changes to This Policy -->
+        <section id="changes">
+            <h2>Changes to This Policy</h2>
+            <p>We may update this Privacy Policy from time to time to align with changes in browser guidelines or extension features. Any updates will be published directly on this page, and the "Effective Date" at the top will be updated accordingly.</p>
+        </section>
+
+        <!-- 11. Contact -->
+        <section id="contact">
+            <h2>Contact</h2>
+            <p>If you have any questions or feedback regarding this Privacy Policy or the operation of ScrollStamp, please feel free to reach out:</p>
+            <div class="contact-info">
+                <p>
+                    <span class="contact-label">Developer:</span>
+                    <span class="contact-value">Sathwik Perla</span>
+                </p>
+                <p>
+                    <span class="contact-label">Email:</span>
+                    <span class="contact-value"><a href="mailto:your@email.com">your@email.com</a></span>
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 Sathwik Perla. All rights reserved. ScrollStamp is an independent extension and is not affiliated with ChatGPT, OpenAI, Anthropic, Google, xAI, DeepSeek, or Perplexity.</p>
+    </footer>
+</div>
+
+</body>
+</html>
