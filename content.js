@@ -67,6 +67,11 @@
   let isAIChat = false;
   let isPDF = false;
   let listenersAttached = false;
+  let isSiteDisabled = false;
+
+  // Hostnames the user has switched ScrollStamp off for. Blocklist, not
+  // allowlist — the extension stays on by default everywhere.
+  const DISABLED_SITES_KEY = "scrollstamp_disabled_sites";
 
   // ============================================
   // AI MESSAGE BOOKMARKING
@@ -613,6 +618,22 @@
     try { return !!chrome?.runtime?.id; } catch { return false; }
   }
 
+  // Re-read the per-site switch. Called on init and whenever the popup flips it,
+  // so toggling takes effect on the open page without a reload.
+  function refreshDisabledState() {
+    if (!isContextAlive()) return;
+    chrome.storage.local.get([DISABLED_SITES_KEY], (result) => {
+      if (chrome.runtime.lastError) return;
+      // Same www.-stripping the popup applies before storing.
+      const host = window.location.hostname.replace(/^www\./, "");
+      isSiteDisabled = (result[DISABLED_SITES_KEY] || []).includes(host);
+      if (isSiteDisabled) {
+        hideSelectionButton();
+        closeSaveForm();
+      }
+    });
+  }
+
   async function saveStamp(stamp) {
     const storageKey = getStorageKey();
     if (!isContextAlive()) return { status: "error", reason: "context_dead" };
@@ -829,6 +850,7 @@
   }
 
   function showSelectionButton(rect) {
+    if (isSiteDisabled) return;
     const btn = getSelectionButton();
     const btnHeight = 28;
     let top, left;
@@ -930,6 +952,7 @@
     });
 
     document.addEventListener("mouseup", (e) => {
+      if (isSiteDisabled) return;
       if (e.target?.closest?.("#scrollstamp-select-btn, #scrollstamp-save-form")) return;
 
       setTimeout(() => {
@@ -1102,8 +1125,16 @@
       listenersAttached = true;
     }
 
+    refreshDisabledState();
     checkPendingScroll();
   }
+
+  // Keep the open page in sync when the popup toggles this site on or off.
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "local" && changes[DISABLED_SITES_KEY]) refreshDisabledState();
+    });
+  } catch (_) {}
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

@@ -9,13 +9,86 @@ const PLATFORM_LOGOS = {
   grok:       "icons/grok.png",
 };
 
+const DISABLED_SITES_KEY = "scrollstamp_disabled_sites";
+
+// Keys under the scrollstamp_ prefix that are settings/state, not bookmark lists.
+// Anything listed here is skipped when reading stamps and preserved by Clear All.
+const RESERVED_KEYS = [
+  "scrollstamp_pending",
+  "scrollstamp_uid",
+  "scrollstamp_dau",
+  "scrollstamp_mau",
+  "scrollstamp_opens",
+  DISABLED_SITES_KEY,
+];
+
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   await ensureContentScriptReady();
   detectCurrentMode();
+  initSiteToggle();
   loadStamps();
   document.getElementById("clear-all").addEventListener("click", clearAllStamps);
+}
+
+// ─── Per-site Enable/Disable ────────────────────
+
+async function initSiteToggle() {
+  const toggle = document.getElementById("site-toggle");
+  const label = document.getElementById("site-hostname");
+  const row = document.getElementById("site-control");
+
+  // Must run on every exit path — the row stays hidden until this fires.
+  const reveal = () => row.classList.add("resolved");
+
+  const unavailable = () => {
+    label.textContent = "Not available on this page";
+    toggle.setAttribute("aria-checked", "false");
+    toggle.disabled = true;
+    reveal();
+  };
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.url || !/^https?:/i.test(tab.url)) {
+    unavailable();
+    return;
+  }
+
+  let hostname;
+  try {
+    // Strip www. before storing so a site served on both apex and www is one
+    // entry — content.js normalizes the same way when checking.
+    hostname = new URL(tab.url).hostname.replace(/^www\./, "");
+  } catch (_) {
+    unavailable();
+    return;
+  }
+
+  const render = (enabled) => {
+    toggle.setAttribute("aria-checked", String(enabled));
+    toggle.title = `${enabled ? "Disable" : "Enable"} ScrollStamp on ${hostname}`;
+    label.textContent = enabled ? hostname : `${hostname} — off`;
+  };
+
+  chrome.storage.local.get([DISABLED_SITES_KEY], (result) => {
+    render(!(result[DISABLED_SITES_KEY] || []).includes(hostname));
+    reveal();
+    // Enable animation only from here on, so the first paint doesn't slide.
+    requestAnimationFrame(() => toggle.classList.add("ready"));
+  });
+
+  toggle.addEventListener("click", () => {
+    chrome.storage.local.get([DISABLED_SITES_KEY], (result) => {
+      const disabled = result[DISABLED_SITES_KEY] || [];
+      const wasDisabled = disabled.includes(hostname);
+      const next = wasDisabled
+        ? disabled.filter((h) => h !== hostname)
+        : [...disabled, hostname];
+      // The content script watches this key and applies it to the open page.
+      chrome.storage.local.set({ [DISABLED_SITES_KEY]: next }, () => render(wasDisabled));
+    });
+  });
 }
 
 // ─── Content Script Readiness ───────────────────
@@ -63,9 +136,11 @@ async function detectCurrentMode() {
         modeBadge.className = "mode-badge ai-mode";
         emptyHint.textContent = "Select text in any AI message to bookmark it";
       } else if (response.isPDF) {
-        modeBadge.textContent = "PDF";
-        modeBadge.className = "mode-badge pdf-mode";
-        emptyHint.textContent = "Select text in the PDF to bookmark it";
+        // Chrome's native PDF viewer renders text inside a plugin, not the DOM,
+        // so there's nothing for the content script to select or anchor to.
+        modeBadge.textContent = "✕ PDF not supported";
+        modeBadge.className = "mode-badge unsupported-mode";
+        emptyHint.textContent = "PDFs aren't supported yet — works on any web page";
       } else {
         modeBadge.textContent = "Scroll";
         modeBadge.className = "mode-badge scroll-mode";
@@ -86,8 +161,8 @@ async function loadStamps() {
 
     Object.keys(items).forEach((key) => {
       if (!key.startsWith("scrollstamp_")) return;
-      // Skip non-bookmark keys (analytics, pending, uid)
-      if (["scrollstamp_pending", "scrollstamp_uid", "scrollstamp_dau", "scrollstamp_mau", "scrollstamp_opens"].includes(key)) return;
+      // Skip non-bookmark keys (settings, analytics, pending, uid)
+      if (RESERVED_KEYS.includes(key)) return;
       const stamps = items[key];
       if (Array.isArray(stamps)) {
         stamps.forEach((stamp) => allStamps.push({ ...stamp, storageKey: key }));
@@ -304,7 +379,7 @@ function clearAllStamps() {
     const keysToRemove = Object.keys(items).filter((k) => {
       if (!k.startsWith("scrollstamp_")) return false;
       // Keep non-bookmark keys intact
-      return !["scrollstamp_pending", "scrollstamp_uid", "scrollstamp_dau", "scrollstamp_mau", "scrollstamp_opens"].includes(k);
+      return !RESERVED_KEYS.includes(k);
     });
     chrome.storage.local.remove(keysToRemove, loadStamps);
   });
