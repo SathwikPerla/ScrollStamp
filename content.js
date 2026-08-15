@@ -214,12 +214,8 @@
       }
 
       stableHits = 0;
-      const useSmooth = attempts === 1 && Math.abs(delta) > 600;
       if (t.container) {
-        if (useSmooth) t.container.scrollTo({ top: t.container.scrollTop + delta, behavior: "smooth" });
-        else t.container.scrollTop += delta;
-      } else if (useSmooth) {
-        window.scrollTo({ top: window.scrollY + delta, behavior: "smooth" });
+        t.container.scrollTop += delta;
       } else {
         window.scrollBy(0, delta);
       }
@@ -228,7 +224,7 @@
         if (onArrive) onArrive(t);
         return;
       }
-      setTimeout(pass, useSmooth ? 380 : 90);
+      setTimeout(pass, 90);
     };
 
     pass();
@@ -388,6 +384,35 @@
     };
   }
 
+  // Helper to normalize text and build a map of indices
+  function getNormalizedTextAndMap(text) {
+    let normalized = "";
+    const map = []; // map[i] = index in original text
+    let isPrevWhitespace = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const isWhitespace = /\s/.test(char);
+
+      if (isWhitespace) {
+        if (!isPrevWhitespace && normalized.length > 0) {
+          normalized += " ";
+          map.push(i);
+          isPrevWhitespace = true;
+        }
+      } else {
+        normalized += char;
+        map.push(i);
+        isPrevWhitespace = false;
+      }
+    }
+    if (normalized.endsWith(" ")) {
+      normalized = normalized.slice(0, -1);
+      map.pop();
+    }
+    return { normalized, map };
+  }
+
   function findTextRange(root, searchText, contextBefore) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
@@ -399,15 +424,28 @@
     }
     if (!nodes.length) return null;
 
-    let textStart = -1;
-    if (contextBefore) {
-      const ctxIdx = fullText.indexOf(contextBefore + searchText);
-      if (ctxIdx >= 0) textStart = ctxIdx + contextBefore.length;
-    }
-    if (textStart < 0) textStart = fullText.indexOf(searchText);
-    if (textStart < 0) return null;
+    const { normalized: normalizedFullText, map: fullToOriginalMap } = getNormalizedTextAndMap(fullText);
+    const { normalized: normSearch } = getNormalizedTextAndMap(searchText || "");
+    const { normalized: normContext } = getNormalizedTextAndMap(contextBefore || "");
 
-    const textEnd = textStart + searchText.length;
+    if (!normSearch) return null;
+
+    let normStart = -1;
+    if (normContext) {
+      const ctxIdx = normalizedFullText.indexOf(normContext + normSearch);
+      if (ctxIdx >= 0) normStart = ctxIdx + normContext.length;
+    }
+    if (normStart < 0) {
+      normStart = normalizedFullText.indexOf(normSearch);
+    }
+    if (normStart < 0) return null;
+
+    const normEnd = normStart + normSearch.length;
+    const textStart = fullToOriginalMap[normStart];
+    const textEnd = fullToOriginalMap[normEnd - 1] + 1;
+
+    if (textStart === undefined || textEnd === undefined) return null;
+
     let startNode = null, startOffset = 0, endNode = null, endOffset = 0;
 
     for (const { node: n, start } of nodes) {
@@ -435,6 +473,19 @@
   }
 
   function highlightRange(range) {
+    if (typeof Highlight !== "undefined" && typeof CSS !== "undefined" && CSS.highlights) {
+      try {
+        const highlight = new Highlight(range);
+        CSS.highlights.set("scrollstamp-custom-highlight", highlight);
+        setTimeout(() => {
+          CSS.highlights.delete("scrollstamp-custom-highlight");
+        }, 2500);
+        return;
+      } catch (e) {
+        console.error("ScrollStamp: CSS Highlight error", e);
+      }
+    }
+
     try {
       const mark = document.createElement("mark");
       mark.className = "scrollstamp-text-highlight";
@@ -956,7 +1007,8 @@
 
       try {
         const pendingUrl = new URL(stamp.url);
-        if (window.location.pathname !== pendingUrl.pathname) return;
+        const currentUrl = new URL(window.location.href);
+        if (currentUrl.origin !== pendingUrl.origin || currentUrl.pathname !== pendingUrl.pathname) return;
       } catch {
         return;
       }
