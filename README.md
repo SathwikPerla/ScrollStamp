@@ -6,8 +6,7 @@ A Chrome extension that bookmarks the exact text you were reading — on any web
 
 100% local. Zero network requests. Zero dependencies.
 
-<!-- TODO: replace with your Chrome Web Store URL -->
-[**Install from the Chrome Web Store →**](https://chromewebstore.google.com/detail/YOUR_EXTENSION_ID)
+[**Install from the Chrome Web Store →**](https://chromewebstore.google.com/detail/scrollstamp/hlnolmjmfgdbaidlgkmfdpnajpemimcb)
 
 <!-- TODO: add demo.gif — a save + jump in one take -->
 
@@ -73,7 +72,7 @@ ScrollStamp is on by default everywhere. Toggle it off for any site from the pop
 
 ## Install
 
-**From the store:** [Chrome Web Store](https://chromewebstore.google.com/detail/YOUR_EXTENSION_ID) <!-- TODO -->
+**From the store:** [Chrome Web Store](https://chromewebstore.google.com/detail/scrollstamp/hlnolmjmfgdbaidlgkmfdpnajpemimcb)
 
 **From source:**
 
