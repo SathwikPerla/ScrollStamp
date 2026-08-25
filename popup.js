@@ -24,11 +24,11 @@ const RESERVED_KEYS = [
 
 document.addEventListener("DOMContentLoaded", init);
 
-async function init() {
-  await ensureContentScriptReady();
-  detectCurrentMode();
+function init() {
   initSiteToggle();
+  detectCurrentMode();
   loadStamps();
+  ensureContentScriptReady();
   document.getElementById("clear-all").addEventListener("click", clearAllStamps);
 }
 
@@ -74,11 +74,12 @@ async function initSiteToggle() {
   chrome.storage.local.get([DISABLED_SITES_KEY], (result) => {
     render(!(result[DISABLED_SITES_KEY] || []).includes(hostname));
     reveal();
-    // Enable animation only from here on, so the first paint doesn't slide.
-    requestAnimationFrame(() => toggle.classList.add("ready"));
+    // Enable CSS animation after initial paint has settled so opening popup does not animate/flicker.
+    setTimeout(() => toggle.classList.add("ready"), 50);
   });
 
   toggle.addEventListener("click", () => {
+    toggle.classList.add("ready");
     chrome.storage.local.get([DISABLED_SITES_KEY], (result) => {
       const disabled = result[DISABLED_SITES_KEY] || [];
       const wasDisabled = disabled.includes(hostname);
