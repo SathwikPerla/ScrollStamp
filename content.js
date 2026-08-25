@@ -801,31 +801,16 @@
   // ============================================
 
   function createPinSvg(width = 14, height = 14) {
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("width", width);
-    svg.setAttribute("height", height);
-    svg.setAttribute("fill", "none");
-    svg.setAttribute("stroke", "currentColor");
-    svg.setAttribute("stroke-width", "2.5");
-    svg.setAttribute("stroke-linecap", "round");
-    svg.setAttribute("stroke-linejoin", "round");
-    svg.classList.add("scrollstamp-svg-pin");
-
-    const p1 = document.createElementNS(svgNS, "path");
-    p1.setAttribute("d", "M12 17v5");
-    svg.appendChild(p1);
-
-    const p2 = document.createElementNS(svgNS, "path");
-    p2.setAttribute("d", "M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.89A.5.5 0 0 0 6.36 14h11.28a.5.5 0 0 0 .25-.56l-1.78-.89A2 2 0 0 1 15 10.76V6h-6v4.76z");
-    svg.appendChild(p2);
-
-    const p3 = document.createElementNS(svgNS, "path");
-    p3.setAttribute("d", "M15 6V3a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3");
-    svg.appendChild(p3);
-
-    return svg;
+    const img = document.createElement("img");
+    img.src = chrome.runtime.getURL("icon.png");
+    img.width = width;
+    img.height = height;
+    img.alt = "ScrollStamp";
+    img.style.display = "block";
+    img.style.objectFit = "contain";
+    img.style.borderRadius = "3px";
+    img.classList.add("scrollstamp-img-pin");
+    return img;
   }
 
   function getSelectionButton() {
