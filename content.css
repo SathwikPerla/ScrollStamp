@@ -41,147 +41,168 @@
   100% { opacity: 0; }
 }
 
-/* ─── Selection Button ────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   APPLE LIQUID GLASS DESIGN SYSTEM (iOS / macOS / visionOS)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── Selection Button (Liquid Glass Panel) ───── */
+/* ─── Selection Button (Decent Glass Panel) ───── */
 #scrollstamp-select-btn {
   position: fixed;
   z-index: 2147483647;
   display: none;
   align-items: center;
-  gap: 5px;
-  padding: 6px 12px 6px 10px;
-  background: #13131f;
-  color: #c8c8ff;
-  border: 1.5px solid rgba(99, 102, 241, 0.65);
-  border-radius: 20px;
-  font-size: 12px;
+  gap: 7px;
+  padding: 4px 14px 4px 5px;
+  background: rgba(16, 16, 26, 0.82);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border-radius: 10px;
+  font-size: 13px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: 0 3px 18px rgba(99, 102, 241, 0.22), 0 1px 5px rgba(0, 0, 0, 0.35);
-  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.18s ease;
   user-select: none;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
 }
 
 #scrollstamp-select-btn:hover {
-  background: #1e1e3a;
-  box-shadow: 0 4px 22px rgba(99, 102, 241, 0.38), 0 2px 7px rgba(0, 0, 0, 0.4);
-  border-color: #6366f1;
+  background: rgba(24, 24, 38, 0.88);
+  border-color: rgba(99, 102, 241, 0.45);
+  box-shadow: 0 18px 44px rgba(99, 102, 241, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
 }
 
 #scrollstamp-select-btn:active {
-  transform: scale(0.95);
+  transform: translateY(0);
 }
 
 #scrollstamp-select-btn .ssb-pin {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ff4a4a;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 #scrollstamp-select-btn .ssb-text {
-  font-size: 12px;
+  font-size: 13px;
+  color: #ffffff;
+  font-weight: 600;
 }
 
-/* ─── Save Form ───────────────────────────────── */
+/* ─── Save Form (Decent Glass Sheet) ─────────────── */
 #scrollstamp-save-form {
   all: initial;
   position: fixed;
   z-index: 2147483647;
-  width: 264px;
-  background: #12121e;
-  border: 1px solid rgba(99, 102, 241, 0.35);
+  width: 256px;
+  background: rgba(16, 16, 26, 0.85);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
   padding: 14px 16px 16px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(99, 102, 241, 0.08);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   box-sizing: border-box;
-  animation: ssf-appear 0.15s ease;
+  animation: ssf-appear 0.2s ease;
 }
 
 @keyframes ssf-appear {
-  from { opacity: 0; transform: translateY(-5px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 #scrollstamp-save-form .ssf-header {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-bottom: 10px;
+  gap: 9px;
+  margin-bottom: 12px;
 }
 
 #scrollstamp-save-form .ssf-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ff4a4a;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
   flex-shrink: 0;
 }
 
 #scrollstamp-save-form .ssf-label {
   font-size: 13px;
   font-weight: 600;
-  color: #dcdcf8;
+  color: #ffffff;
+  letter-spacing: -0.01em;
   flex: 1;
   font-family: inherit;
 }
 
 #scrollstamp-save-form .ssf-close {
   all: initial;
-  color: #5a5a7a;
+  color: #a0a0c0;
   cursor: pointer;
-  font-size: 13px;
-  font-family: sans-serif;
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-size: 11px;
+  font-family: system-ui, -apple-system, sans-serif;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
-  transition: color 0.15s, background 0.15s;
+  transition: all 0.15s ease;
 }
 
 #scrollstamp-save-form .ssf-close:hover {
-  color: #b0b0d8;
-  background: rgba(255, 255, 255, 0.07);
-}
-
-#scrollstamp-save-form .ssf-preview {
-  font-size: 11px;
-  color: #6a6a8a;
-  background: rgba(99, 102, 241, 0.06);
-  border: 1px solid rgba(99, 102, 241, 0.14);
-  border-radius: 6px;
-  padding: 6px 9px;
-  margin-bottom: 10px;
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: inherit;
-  box-sizing: border-box;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
 }
 
 #scrollstamp-save-form .ssf-input {
   all: initial;
   display: block;
   width: 100%;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid #2a2a42;
-  border-radius: 7px;
-  color: #dcdcf8;
-  font-size: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  color: #ffffff;
+  caret-color: #6366f1;
+  font-size: 13px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  padding: 8px 10px;
+  padding: 8px 11px;
   margin-bottom: 12px;
   box-sizing: border-box;
   outline: none;
-  transition: border-color 0.15s, background 0.15s;
+  transition: all 0.15s ease;
+}
+
+#scrollstamp-save-form .ssf-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
 }
 
 #scrollstamp-save-form .ssf-input:focus {
+  background: rgba(0, 0, 0, 0.35);
   border-color: #6366f1;
-  background: rgba(99, 102, 241, 0.07);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
 }
 
 #scrollstamp-save-form .ssf-actions {
@@ -194,40 +215,46 @@
   all: initial;
   font-size: 12px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-weight: 500;
+  font-weight: 600;
   padding: 6px 14px;
-  border-radius: 7px;
+  border-radius: 8px;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition: all 0.15s ease;
   box-sizing: border-box;
   white-space: nowrap;
 }
 
 #scrollstamp-save-form .ssf-cancel-btn {
-  background: transparent;
-  border-color: #2a2a42;
-  color: #7a7a9a;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #c0c0e0;
 }
 
 #scrollstamp-save-form .ssf-cancel-btn:hover {
-  border-color: #4a4a6a;
-  color: #b0b0d8;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
 }
 
 #scrollstamp-save-form .ssf-save-btn {
   background: #6366f1;
-  color: #fff;
+  color: #ffffff;
   border-color: #6366f1;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
 }
 
 #scrollstamp-save-form .ssf-save-btn:hover {
   background: #5255e0;
   border-color: #5255e0;
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.5);
+  transform: translateY(-1px);
 }
 
 #scrollstamp-save-form .ssf-save-btn:active {
   background: #4547cc;
+  border-color: #4547cc;
+  transform: translateY(0);
 }
 
 /* ─── Text highlight on restore ───────────────── */

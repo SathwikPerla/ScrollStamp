@@ -708,7 +708,7 @@
 
     const icon = document.createElement("span");
     icon.className = "ssf-icon";
-    icon.appendChild(createPinSvg(16, 16));
+    icon.appendChild(createPinSvg(22, 22));
 
     const label = document.createElement("span");
     label.className = "ssf-label";
@@ -722,10 +722,6 @@
     header.appendChild(icon);
     header.appendChild(label);
     header.appendChild(closeBtn);
-
-    const preview = document.createElement("div");
-    preview.className = "ssf-preview";
-    preview.textContent = defaultName.length > 60 ? defaultName.substring(0, 57) + "…" : defaultName;
 
     const input = document.createElement("input");
     input.className = "ssf-input";
@@ -749,13 +745,12 @@
     actions.appendChild(saveBtn);
 
     form.appendChild(header);
-    form.appendChild(preview);
     form.appendChild(input);
     form.appendChild(actions);
 
     // Position near selection, clamped to viewport
     const formW = 264;
-    const formH = 162;
+    const formH = 130;
     let top = Math.max(8, anchorRect.top - formH - 8);
     let left = Math.min(window.innerWidth - formW - 8, Math.max(8, anchorRect.left));
     if (top < 8 && anchorRect.bottom + formH + 8 < window.innerHeight) {
@@ -802,7 +797,11 @@
 
   function createPinSvg(width = 14, height = 14) {
     const img = document.createElement("img");
-    img.src = chrome.runtime.getURL("icon.png");
+    if (isContextAlive()) {
+      try {
+        img.src = chrome.runtime.getURL("icon.png");
+      } catch (_) {}
+    }
     img.width = width;
     img.height = height;
     img.alt = "ScrollStamp";
@@ -822,7 +821,7 @@
 
     const pin = document.createElement("span");
     pin.className = "ssb-pin";
-    pin.appendChild(createPinSvg(13, 13));
+    pin.appendChild(createPinSvg(18, 18));
 
     const text = document.createElement("span");
     text.className = "ssb-text";

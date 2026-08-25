@@ -41,8 +41,17 @@ body {
 }
 
 .header-logo {
-  font-size: 16px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
 }
 
 .header-title {
@@ -243,7 +252,7 @@ body {
 .stamp-item.type-pdf       { border-left-color: rgba(251, 146, 60, 0.45); }
 
 .stamp-icon {
-  font-size: 17px;
+  font-size: 20px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -254,8 +263,8 @@ body {
 }
 
 .stamp-platform-logo {
-  width: 22px;
-  height: 22px;
+  width: 25px;
+  height: 25px;
   border-radius: 4px;
   object-fit: contain;
 }
