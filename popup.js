@@ -213,7 +213,7 @@ function createStampElement(stamp) {
     img.className = "stamp-platform-logo";
     iconSpan.appendChild(img);
   } else {
-    iconSpan.textContent = isSelection ? "✂️" : isMessage ? "💬" : isPdf ? "📄" : "📍";
+    iconSpan.textContent = isSelection ? "🌐" : isMessage ? "💬" : isPdf ? "📄" : "📍";
   }
 
   // Title — prefer custom title, fall back to preview or pageTitle
