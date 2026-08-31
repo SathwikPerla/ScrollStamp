@@ -202,39 +202,124 @@
 
   // One glide, not a chase.
   //
-  // The old approach measured the target, corrected instantly, measured again,
-  // and repeated up to ten times. Every correction was a visible hop, and on a
-  // page still rendering content above the target it produced exactly the
-  // "jumps here and there, sometimes more jerking" the arrival had become.
+  // FIND → STABILIZE → ONE SMOOTH GLIDE → VERIFY → silent correction only if
+  // needed → VERIFY → DONE. The glide is the only visible movement; corrections
+  // are instant, tiny, and capped, so there is no visible chase and no endless
+  // loop. The target is re-resolved from the live DOM at every step — no rect
+  // measured earlier in the navigation is ever reused, because content identity
+  // decides *what* to land on and only current geometry decides *where*.
   //
-  // Instead: wait for the layout to stop changing, then perform a single smooth
-  // scroll to a position that is already correct. Only if reflow moved the target
-  // while the animation ran does one silent snap follow.
-  //
-  // The trade-off is deliberate. It no longer chases a target that keeps
-  // drifting, so on a page that reflows heavily right after arrival the landing
-  // can finish slightly off instead of being corrected repeatedly. That repeated
-  // correction was the jitter, and the settle-wait beforehand is what makes the
-  // single glide land correctly in the first place.
-  function arriveSmoothly(resolveTarget, desiredTop, onDone) {
-    const SETTLE_TICK = 90;
-    const SETTLE_STABLE = 2;   // consecutive unchanged heights counts as settled
-    const SETTLE_MAX = 8;      // ~720ms ceiling, so a busy page cannot stall the jump
-    const SNAP_PX = 24;        // below this, drift is not worth another movement
+  // Any later navigation bumps this token, which every scheduled step checks,
+  // so two arrivals can never fight over the scroll position. A real user
+  // gesture bumps it too: with a tight landing tolerance, a late correction
+  // would otherwise yank the view back out of the user's hands.
+  let arrivalToken = 0;
 
-    let lastHeight = -1;
-    let stableTicks = 0;
-    let ticks = 0;
+  function cancelArrival() {
+    arrivalToken++;
+  }
+
+  function arriveSmoothly(resolveTarget, desiredTop, onDone) {
+    // Landing tolerance. The old 24px was loose enough to feel "slightly off"
+    // compared to a second click. The browser lands a smooth scroll within a
+    // fraction of a pixel, so this only has to absorb sub-pixel rect rounding —
+    // 3px is below what the eye can call misplaced.
+    const DONE_PX = 3;
+    const SETTLE_TICK = 70;
+    const SETTLE_MAX_MS = 700;  // a page that never settles cannot stall the jump
+    const GLIDE_MAX_MS = 1200;  // scrollend normally ends the wait far earlier
+    const MAX_CORRECTIONS = 2;  // hard cap — verify, correct, verify, done
+
+    const token = ++arrivalToken;
+    const alive = () => token === arrivalToken;
+
+    const passiveCapture = { capture: true, passive: true };
+    const detach = () => {
+      window.removeEventListener("wheel", onUserGesture, passiveCapture);
+      window.removeEventListener("touchstart", onUserGesture, passiveCapture);
+      window.removeEventListener("keydown", onUserGesture, true);
+    };
+    const onUserGesture = () => { if (alive()) arrivalToken++; detach(); };
+    window.addEventListener("wheel", onUserGesture, passiveCapture);
+    window.addEventListener("touchstart", onUserGesture, passiveCapture);
+    window.addEventListener("keydown", onUserGesture, true);
+
+    const finish = (t) => {
+      detach();
+      if (t && onDone) onDone(t);
+    };
+
+    const scrollPos = (container) => (container ? container.scrollTop : window.scrollY);
+
+    const measure = () => {
+      const t = resolveTarget();
+      if (!t) return null;
+      return {
+        // Document-space position: immune to our own scrolling, so a change here
+        // means content above the target really moved it.
+        docTop: t.rect.top + scrollPos(t.container),
+        height: t.container ? t.container.scrollHeight : document.documentElement.scrollHeight,
+      };
+    };
+
+    // VERIFY. Corrections are instant and capped: a few pixels applied without
+    // animation reads as the page settling, while a second smooth scroll would
+    // read as a second scroll. The re-check a frame later exists because scroll
+    // anchoring can react to the adjustment itself.
+    const verify = (correctionsLeft) => {
+      if (!alive()) return;
+      const t = resolveTarget();
+      if (!t) return detach();
+
+      const drift = t.rect.top - desiredTop;
+      if (Math.abs(drift) <= DONE_PX || correctionsLeft <= 0) return finish(t);
+
+      if (t.container) t.container.scrollTop += drift;
+      else window.scrollBy(0, drift);
+
+      requestAnimationFrame(() => verify(correctionsLeft - 1));
+    };
+
+    // The browser owns the smooth animation's duration, so its end is detected,
+    // not estimated: scrollend where it fires, a short stillness poll where it
+    // does not. Measuring a rect mid-flight describes where the target is
+    // passing through, not where it will rest.
+    const waitForGlideEnd = (container, done) => {
+      const eventTarget = container || window;
+      let finished = false;
+      let lastPos = scrollPos(container);
+      let stillPolls = 0;
+
+      const complete = () => {
+        if (finished) return;
+        finished = true;
+        eventTarget.removeEventListener("scrollend", complete);
+        clearInterval(pollTimer);
+        clearTimeout(capTimer);
+        if (alive()) done();
+      };
+
+      eventTarget.addEventListener("scrollend", complete, { once: true, passive: true });
+      const pollTimer = setInterval(() => {
+        if (!alive()) return complete();
+        const pos = scrollPos(container);
+        if (Math.abs(pos - lastPos) < 1) {
+          if (++stillPolls >= 2) return complete();
+        } else {
+          stillPolls = 0;
+        }
+        lastPos = pos;
+      }, 80);
+      const capTimer = setTimeout(complete, GLIDE_MAX_MS);
+    };
 
     const glide = () => {
+      if (!alive()) return;
       const t = resolveTarget();
-      if (!t) return;
+      if (!t) return detach(); // target vanished (re-render); leave the view where it is
 
       const delta = t.rect.top - desiredTop;
-      if (Math.abs(delta) <= 2) {
-        if (onDone) onDone(t);
-        return;
-      }
+      if (Math.abs(delta) <= DONE_PX) return finish(t);
 
       if (t.container) {
         t.container.scrollTo({ top: t.container.scrollTop + delta, behavior: "smooth" });
@@ -242,40 +327,31 @@
         window.scrollTo({ top: window.scrollY + delta, behavior: "smooth" });
       }
 
-      // Give the animation time to finish before looking again. Reading a rect
-      // mid-flight describes where the target is passing through, not where it
-      // will rest.
-      const animationMs = Math.min(900, 320 + Math.abs(delta) * 0.3);
-      setTimeout(() => {
-        const after = resolveTarget();
-        if (!after) return;
-
-        const drift = after.rect.top - desiredTop;
-        if (Math.abs(drift) > SNAP_PX) {
-          // Instant and once only. At this distance it reads as the page
-          // settling rather than as a second scroll.
-          if (after.container) after.container.scrollTop += drift;
-          else window.scrollBy(0, drift);
-        }
-
-        if (onDone) onDone(resolveTarget() || after);
-      }, animationMs);
+      waitForGlideEnd(t.container, () => verify(MAX_CORRECTIONS));
     };
 
-    // Content rendering above the target keeps changing its position, so measure
-    // only once the height holds still. This is what lets a single glide be
-    // accurate enough to need no follow-up.
+    // STABILIZE. Watch the target's own document-space position, not just the
+    // page height: height can hold still while a reflow above still shifts the
+    // target, and the target's position is exactly what the glide is about to
+    // trust. Two agreeing samples one frame apart end the wait immediately, so
+    // an already-quiet page — the fast-path case — costs about one frame here
+    // rather than a fixed delay.
+    const startedAt = Date.now();
+    let prevSample = null;
+    let sampleCount = 0;
+
     const settle = () => {
-      const t = resolveTarget();
-      const container = t && t.container;
-      const height = container ? container.scrollHeight : document.documentElement.scrollHeight;
+      if (!alive()) return;
+      sampleCount++;
+      const cur = measure();
+      const stable = cur && prevSample &&
+        Math.abs(cur.docTop - prevSample.docTop) < 1 &&
+        Math.abs(cur.height - prevSample.height) < 1;
+      prevSample = cur;
 
-      if (height === lastHeight) stableTicks++;
-      else stableTicks = 0;
-      lastHeight = height;
-
-      if (stableTicks >= SETTLE_STABLE || ++ticks >= SETTLE_MAX) return glide();
-      setTimeout(settle, SETTLE_TICK);
+      if (stable || Date.now() - startedAt > SETTLE_MAX_MS) return glide();
+      if (sampleCount === 1) requestAnimationFrame(settle);
+      else setTimeout(settle, SETTLE_TICK);
     };
 
     settle();
@@ -421,7 +497,9 @@
     activeHunt = null;
     clearTimeout(hunt.timer);
     hunt.detach();
-    if (reason === "user") hideToast();
+    // A persistent toast belongs to the hunt that showed it; when that hunt dies
+    // for any reason, the toast must leave with it or it lingers forever.
+    if (reason === "user" || hunt.toastShown) hideToast();
   }
 
   function huntForTarget(stamp, resolve, desiredTop) {
@@ -447,7 +525,7 @@
     const RUNAWAY_MS = 600000;    // 10 minutes, purely a guard against an endless loop
 
     const startedAt = Date.now();
-    const hunt = { timer: null, detach: () => {} };
+    const hunt = { timer: null, toastShown: false, detach: () => {} };
     activeHunt = hunt;
 
     // The hunt moves the page on the user's behalf, so any real gesture hands
@@ -512,7 +590,6 @@
     let mostMessages = -1;
     let nudged = false;
     let announced = false;
-    let toastShown = false;
     let lastNudgeAt = 0;
     // Every sign of life pushes this forward: the container appearing, the page
     // growing taller, another message arriving. The hunt only gives up once
@@ -569,8 +646,8 @@
       if (phase === "grow") {
         // Only the slow path is worth announcing; a quick restore should not
         // flash a toast on its way past.
-        if (!toastShown) {
-          toastShown = true;
+        if (!hunt.toastShown) {
+          hunt.toastShown = true;
           showToast("Finding your bookmark…", { persist: true });
         }
 
@@ -1353,6 +1430,7 @@
     // position. Note the return value now means "started", not "found" — a hunt
     // may still be running when this returns.
     cancelHunt("superseded");
+    cancelArrival();
     if (stamp.type === "selection") return scrollToSelection(stamp);
     if (stamp.type === "message") return scrollToMessage(stamp);
     return scrollToPosition(stamp);
