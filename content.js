@@ -77,8 +77,19 @@
   // AI MESSAGE BOOKMARKING
   // ============================================
 
+  // Re-reading the whole conversation is not free on a long chat, and the
+  // Claude/Grok fallback below forces a layout for every candidate it inspects.
+  // The hunt asks for this list twice per cycle, so a very short memo removes the
+  // duplicate read. The window is far shorter than any polling interval, so no
+  // caller can observe a meaningfully stale list.
+  let messagesMemo = { at: 0, list: null };
+
   function getAssistantMessages() {
     if (!currentPlatform || !AI_PLATFORM_SELECTORS[currentPlatform]) return [];
+
+    const now = Date.now();
+    if (messagesMemo.list && now - messagesMemo.at < 40) return messagesMemo.list;
+
     const selector = AI_PLATFORM_SELECTORS[currentPlatform].assistant;
     let messages = Array.from(document.querySelectorAll(selector));
 
@@ -106,6 +117,7 @@
       });
     }
 
+    messagesMemo = { at: now, list: messages };
     return messages;
   }
 
@@ -188,51 +200,85 @@
     };
   }
 
-  // Iteratively scroll so the resolved target settles at `desiredTop` viewport px.
-  // The target is re-resolved every pass to absorb reflow from lazily-rendered
-  // content — this is what removes the "click again and again" behaviour. The
-  // first big jump is smooth for UX; corrections are instant so each measurement
-  // reflects the real position (a mid-animation rect would compound the error).
-  function convergeScroll(resolveTarget, desiredTop, onArrive) {
-    const TOLERANCE = 6;
-    const MAX_ATTEMPTS = 12;
-    let attempts = 0;
-    let stableHits = 0;
+  // One glide, not a chase.
+  //
+  // The old approach measured the target, corrected instantly, measured again,
+  // and repeated up to ten times. Every correction was a visible hop, and on a
+  // page still rendering content above the target it produced exactly the
+  // "jumps here and there, sometimes more jerking" the arrival had become.
+  //
+  // Instead: wait for the layout to stop changing, then perform a single smooth
+  // scroll to a position that is already correct. Only if reflow moved the target
+  // while the animation ran does one silent snap follow.
+  //
+  // The trade-off is deliberate. It no longer chases a target that keeps
+  // drifting, so on a page that reflows heavily right after arrival the landing
+  // can finish slightly off instead of being corrected repeatedly. That repeated
+  // correction was the jitter, and the settle-wait beforehand is what makes the
+  // single glide land correctly in the first place.
+  function arriveSmoothly(resolveTarget, desiredTop, onDone) {
+    const SETTLE_TICK = 90;
+    const SETTLE_STABLE = 2;   // consecutive unchanged heights counts as settled
+    const SETTLE_MAX = 8;      // ~720ms ceiling, so a busy page cannot stall the jump
+    const SNAP_PX = 24;        // below this, drift is not worth another movement
 
-    const pass = () => {
-      attempts++;
+    let lastHeight = -1;
+    let stableTicks = 0;
+    let ticks = 0;
+
+    const glide = () => {
       const t = resolveTarget();
-      if (!t) return; // target vanished (re-render); leave the view where it is
+      if (!t) return;
 
       const delta = t.rect.top - desiredTop;
-
-      if (Math.abs(delta) <= TOLERANCE) {
-        // Confirm across two consecutive passes — one pass can land right before
-        // the next reflow nudges things again.
-        stableHits++;
-        if (stableHits >= 2 || attempts >= MAX_ATTEMPTS) {
-          if (onArrive) onArrive(t);
-          return;
-        }
-        setTimeout(pass, 80);
+      if (Math.abs(delta) <= 2) {
+        if (onDone) onDone(t);
         return;
       }
 
-      stableHits = 0;
       if (t.container) {
-        t.container.scrollTop += delta;
+        t.container.scrollTo({ top: t.container.scrollTop + delta, behavior: "smooth" });
       } else {
-        window.scrollBy(0, delta);
+        window.scrollTo({ top: window.scrollY + delta, behavior: "smooth" });
       }
 
-      if (attempts >= MAX_ATTEMPTS) {
-        if (onArrive) onArrive(t);
-        return;
-      }
-      setTimeout(pass, 90);
+      // Give the animation time to finish before looking again. Reading a rect
+      // mid-flight describes where the target is passing through, not where it
+      // will rest.
+      const animationMs = Math.min(900, 320 + Math.abs(delta) * 0.3);
+      setTimeout(() => {
+        const after = resolveTarget();
+        if (!after) return;
+
+        const drift = after.rect.top - desiredTop;
+        if (Math.abs(drift) > SNAP_PX) {
+          // Instant and once only. At this distance it reads as the page
+          // settling rather than as a second scroll.
+          if (after.container) after.container.scrollTop += drift;
+          else window.scrollBy(0, drift);
+        }
+
+        if (onDone) onDone(resolveTarget() || after);
+      }, animationMs);
     };
 
-    pass();
+    // Content rendering above the target keeps changing its position, so measure
+    // only once the height holds still. This is what lets a single glide be
+    // accurate enough to need no follow-up.
+    const settle = () => {
+      const t = resolveTarget();
+      const container = t && t.container;
+      const height = container ? container.scrollHeight : document.documentElement.scrollHeight;
+
+      if (height === lastHeight) stableTicks++;
+      else stableTicks = 0;
+      lastHeight = height;
+
+      if (stableTicks >= SETTLE_STABLE || ++ticks >= SETTLE_MAX) return glide();
+      setTimeout(settle, SETTLE_TICK);
+    };
+
+    settle();
   }
 
   // Highlight whatever the converger arrived at (a text range or a whole message).
@@ -245,76 +291,322 @@
     }
   }
 
-  // Resolve a saved assistant message back to a live DOM element, by index first
-  // then by content prefix (index survives appends; content survives re-ordering).
+  // Among candidate positions, the one closest to where the message sat when it
+  // was bookmarked. Used only to break ties, never to identify on its own.
+  function pickNearest(candidates, index) {
+    if (typeof index !== "number" || index < 0) return candidates[0];
+    let best = candidates[0];
+    let bestDistance = Math.abs(best - index);
+    for (const c of candidates) {
+      const distance = Math.abs(c - index);
+      if (distance < bestDistance) { bestDistance = distance; best = c; }
+    }
+    return best;
+  }
+
+  // Resolve a saved assistant message back to a live DOM element.
+  //
+  // Matching is by content, with the stored index used only as a tie-breaker.
+  // That ordering matters: paging older messages in shifts every index, so an
+  // index-first lookup silently drifts onto the wrong message. Text does not
+  // shift. The stored preview is compared at full length (100 chars) before any
+  // shorter prefix is tried, because assistant replies routinely share an
+  // opening phrase and a 30-char prefix is not distinctive enough to pick
+  // between them.
+  function previewMatchesAnchor(preview, anchor) {
+    if (!preview) return false;
+    if (preview === anchor) return true;
+    if (preview.startsWith(anchor)) return true;
+    // Either side can be the truncated one. The length floor stops a short
+    // preview from matching half the conversation.
+    return preview.length >= 40 && anchor.startsWith(preview);
+  }
+
+  // Remembers the element resolved last, so the repeated re-resolves during a
+  // scroll do not re-read every message in the conversation.
+  let lastMessageMatch = null;
+
   function findMessageElement(anchorPreview, index) {
     const messages = getAssistantMessages();
     if (messages.length === 0) return null;
-    const anchor = (anchorPreview || "").substring(0, 30);
-    if (index !== undefined && index !== null && index >= 0 && index < messages.length) {
-      if (!anchor || getMessagePreview(messages[index]).startsWith(anchor)) return messages[index];
+
+    const anchor = (anchorPreview || "").trim();
+    if (!anchor) {
+      return typeof index === "number" && index >= 0 && index < messages.length
+        ? messages[index]
+        : null;
     }
-    if (anchor) {
-      for (const msg of messages) {
-        if (getMessagePreview(msg).startsWith(anchor)) return msg;
+
+    const remember = (element) => {
+      if (element) lastMessageMatch = { anchor, index, element };
+      return element;
+    };
+
+    // Fast path 1: the element found moments ago, re-validated. The arrival and
+    // the hunt both re-resolve repeatedly, and previewing every message on each
+    // pass would mean hundreds of textContent reads per second in a long chat.
+    //
+    // The stored index is part of the cache key, not just the anchor. Two
+    // bookmarks in one conversation can share a 100-char opening, so keying on
+    // text alone would hand the second click the first one's element.
+    const cached = lastMessageMatch;
+    if (cached && cached.anchor === anchor && cached.index === index && cached.element.isConnected) {
+      if (previewMatchesAnchor(getMessagePreview(cached.element), anchor)) return cached.element;
+    }
+
+    // Fast path 2: the stored index still points at the right message. That is
+    // the common case whenever nothing has been paged in above it.
+    if (typeof index === "number" && index >= 0 && index < messages.length) {
+      if (previewMatchesAnchor(getMessagePreview(messages[index]), anchor)) {
+        return remember(messages[index]);
       }
     }
+
+    // Full scan. Only reached when the index has shifted or gone stale.
+    const previews = messages.map(getMessagePreview);
+    const collect = (test) => {
+      const hits = [];
+      previews.forEach((p, i) => { if (test(p)) hits.push(i); });
+      return hits;
+    };
+
+    // Strongest signal: the stored preview reproduced exactly.
+    let hits = collect((p) => p === anchor);
+    if (hits.length) return remember(messages[pickNearest(hits, index)]);
+
+    hits = collect((p) => previewMatchesAnchor(p, anchor));
+    if (hits.length) return remember(messages[pickNearest(hits, index)]);
+
+    // Looser tiers for messages the platform has since re-rendered slightly.
+    // The 30-char tier is deliberately the same width the original matcher used,
+    // so anything that resolved before still resolves now. The difference is that
+    // it is reached last rather than first, and that ties go to the message
+    // nearest the stored index instead of simply the first one in the document.
+    for (const width of [40, 30]) {
+      const shortAnchor = anchor.substring(0, width);
+      if (shortAnchor.length < 20) continue;
+      hits = collect((p) => p.startsWith(shortAnchor));
+      if (hits.length) return remember(messages[pickNearest(hits, index)]);
+    }
+
     return null;
   }
 
-  // When the target isn't in the DOM (far jump / virtualized / not-yet-rendered),
-  // drive the container toward the saved anchor to force rendering, re-searching
-  // until the target appears, then hand off to the converger.
-  function renderThenResearch(stamp, resolve, desiredTop) {
-    const container = findMainScrollContainer();
-    const hasRatio = typeof stamp.containerScrollRatio === "number";
-    const hasAbs = typeof stamp.containerScrollY === "number";
+  // ============================================
+  // TARGET HUNT (one click, however long it takes)
+  // ============================================
 
-    if (!container || (!hasRatio && !hasAbs)) {
-      // Legacy stamps / window-scrolled pages: best we can do is the saved Y.
+  // A bookmarked message usually is not in the DOM when the jump begins: chats
+  // page older messages in on demand, or virtualize the list so only the visible
+  // window exists. The hunt keeps driving the container until the target really
+  // appears, so one click is enough however far back the message sits.
+  //
+  // The previous implementation gave up after about 5.6 seconds, or sooner once
+  // the scroll position stopped moving, which is what forced the click-again-and
+  // -again behaviour: each click loaded one more page and then stopped. Two
+  // things changed. It now stops only when the container has genuinely stopped
+  // growing, meaning the start of the conversation has been reached; and it stops
+  // trusting the saved scroll ratio, which was measured against the page height
+  // at bookmark time and points somewhere else entirely once pagination has
+  // changed that height.
+  //
+  // GROW walks the view up to make the platform paginate, probing after each
+  // step. SEEK then covers virtualized lists, where the height was full size all
+  // along and nothing grows.
+  let activeHunt = null;
+
+  function cancelHunt(reason) {
+    if (!activeHunt) return;
+    const hunt = activeHunt;
+    activeHunt = null;
+    clearTimeout(hunt.timer);
+    hunt.detach();
+    if (reason === "user") hideToast();
+  }
+
+  function huntForTarget(stamp, resolve, desiredTop) {
+    cancelHunt("superseded");
+
+    const PROBE_MS = 300;
+    // Small on purpose. This only has to produce a real upward scroll event; at
+    // 300px the page visibly shook for the whole hunt, and at this size the
+    // jitter is not noticeable against content loading in above.
+    const NUDGE_PX = 24;
+    // Stalling is measured in TIME, not in probe count. A huge conversation on a
+    // slow connection can take seconds to return one page of history, and a
+    // count-based limit would read that pause as "the history is exhausted" and
+    // stop early — the exact failure being fixed.
+    const STALL_MS = 5000;
+    // Short, quick first pass at the saved position, before any pagination.
+    const FAST_SEEK_PROBES = 2;
+    const FAST_SEEK_MS = 150;
+    // Only nudge after loading has been quiet this long, so an arriving page is
+    // never interrupted and the view stays still while content streams in.
+    const QUIET_MS = 500;
+    const SWEEP_PROBES = 20;      // wide sweep once growth has genuinely stopped
+    const RUNAWAY_MS = 600000;    // 10 minutes, purely a guard against an endless loop
+
+    const startedAt = Date.now();
+    const hunt = { timer: null, detach: () => {} };
+    activeHunt = hunt;
+
+    // The hunt moves the page on the user's behalf, so any real gesture hands
+    // control straight back. Plain scroll events are deliberately not in this
+    // set, because the hunt generates those itself.
+    const onUserGesture = () => cancelHunt("user");
+    const passiveCapture = { capture: true, passive: true };
+    window.addEventListener("wheel", onUserGesture, passiveCapture);
+    window.addEventListener("touchstart", onUserGesture, passiveCapture);
+    window.addEventListener("keydown", onUserGesture, true);
+    hunt.detach = () => {
+      window.removeEventListener("wheel", onUserGesture, passiveCapture);
+      window.removeEventListener("touchstart", onUserGesture, passiveCapture);
+      window.removeEventListener("keydown", onUserGesture, true);
+    };
+
+    const settle = () => {
+      if (activeHunt === hunt) activeHunt = null;
+      hunt.detach();
+    };
+
+    const succeed = () => {
+      settle();
+      hideToast();
+      arriveSmoothly(resolve, desiredTop, highlightArrival);
+    };
+
+    const fail = () => {
+      settle();
+      // Window-scrolled pages and older bookmarks have no container anchor, so
+      // the saved offset is the only thing left to try.
       if (typeof stamp.scrollY === "number" && stamp.scrollY > 0) {
+        hideToast();
         window.scrollTo({ top: stamp.scrollY, behavior: "smooth" });
+        return;
+      }
+      showToast("Couldn't find that bookmark on this page");
+    };
+
+    // Probe around the saved position rather than trusting it outright: the ratio
+    // was captured against a different page height, so it is a hint about roughly
+    // where to look. `reach` controls how far the sweep widens.
+    const seekTo = (container, maxScroll, n, total, reach) => {
+      if (typeof stamp.containerScrollRatio === "number") {
+        const spread = ((n - 1) / total) * reach;
+        const offset = n % 2 ? -spread : spread;
+        const ratio = Math.min(1, Math.max(0, stamp.containerScrollRatio + offset));
+        container.scrollTop = ratio * maxScroll;
+        return true;
+      }
+      if (typeof stamp.containerScrollY === "number") {
+        container.scrollTop = Math.min(stamp.containerScrollY, maxScroll);
         return true;
       }
       return false;
-    }
+    };
 
-    let lastScrollTop = -1;
-    let stableCount = 0;
-    let tries = 0;
-    const MAX_TRIES = 40; // Allow sufficient time for long virtualized pages to load
+    let phase = "seek";
+    let seekProbes = 0;
+    let sweepProbes = 0;
+    let tallest = -1;
+    let mostMessages = -1;
+    let nudged = false;
+    let announced = false;
+    let toastShown = false;
+    let lastNudgeAt = 0;
+    // Every sign of life pushes this forward: the container appearing, the page
+    // growing taller, another message arriving. The hunt only gives up once
+    // nothing at all has happened for STALL_MS, so it keeps going for as long as
+    // the conversation keeps loading, however many rounds that takes.
+    let lastProgressAt = Date.now();
 
-    const retry = () => {
-      tries++;
-      const currentTarget = resolve();
-      if (currentTarget) {
-        convergeScroll(resolve, desiredTop, highlightArrival);
+    const probe = () => {
+      if (activeHunt !== hunt) return;
+      if (resolve()) return succeed();
+      if (Date.now() - startedAt > RUNAWAY_MS) return fail();
+
+      const container = findMainScrollContainer();
+      if (!container) {
+        // In a chat this only means messages have not rendered yet on a fresh
+        // navigation, so waiting is right. Anywhere else there is no inner
+        // scroller to paginate and never will be, so fall straight back to the
+        // saved offset instead of stalling for seconds first.
+        if (!isAIChat) return fail();
+        if (Date.now() - lastProgressAt > STALL_MS) return fail();
+        hunt.timer = setTimeout(probe, PROBE_MS);
         return;
       }
 
+      if (!announced) {
+        announced = true;
+        lastProgressAt = Date.now(); // the container appearing is progress
+      }
+
+      const height = container.scrollHeight;
+      const count = getAssistantMessages().length;
+      const grew = height > tallest + 4 || count > mostMessages;
+      if (height > tallest) tallest = height;
+      if (count > mostMessages) mostMessages = count;
+      if (grew) lastProgressAt = Date.now();
+
       const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
-      const destY = hasRatio
-        ? stamp.containerScrollRatio * maxScroll
-        : Math.min(stamp.containerScrollY, maxScroll);
 
-      container.scrollTop = destY;
-
-      // Track if scroll position has stabilized (meaning no new virtual elements are loading)
-      if (Math.abs(container.scrollTop - lastScrollTop) < 5) {
-        stableCount++;
-      } else {
-        stableCount = 0;
+      // SEEK runs first and is short. A target that is merely off-screen in a
+      // virtualized list renders as soon as its window is scrolled into view, so
+      // trying the saved position costs a few hundred milliseconds. Paginating
+      // the whole history is the slow path and should not be entered until this
+      // has failed — going there first is what made a nearby bookmark take
+      // seconds, because it scrolled to the top and then waited out the stall.
+      if (phase === "seek") {
+        seekProbes++;
+        if (seekProbes <= FAST_SEEK_PROBES && seekTo(container, maxScroll, seekProbes, FAST_SEEK_PROBES, 0.08)) {
+          hunt.timer = setTimeout(probe, FAST_SEEK_MS);
+          return;
+        }
+        phase = "grow";
       }
-      lastScrollTop = container.scrollTop;
 
-      // Keep driving the scroll container if target isn't found, 
-      // max retries aren't met, and new content is still loading.
-      if (tries < MAX_TRIES && stableCount < 6) {
-        setTimeout(retry, 140);
+      if (phase === "grow") {
+        // Only the slow path is worth announcing; a quick restore should not
+        // flash a toast on its way past.
+        if (!toastShown) {
+          toastShown = true;
+          showToast("Finding your bookmark…", { persist: true });
+        }
+
+        if (Date.now() - lastProgressAt < STALL_MS) {
+          const now = Date.now();
+          // Sit still while content is arriving, and nudge only once loading has
+          // gone quiet. The nudge is a trigger, not a metronome: nudging every
+          // single cycle is what kept the page jittering even at 24px.
+          //
+          // The alternation matters. Assigning the value scrollTop already holds
+          // fires no scroll event at all, so a platform that paginates from a
+          // scroll listener or a top sentinel would load one page and then stop.
+          if (now - lastProgressAt > QUIET_MS && now - lastNudgeAt > QUIET_MS) {
+            container.scrollTop = nudged ? 0 : Math.min(NUDGE_PX, container.scrollHeight);
+            nudged = !nudged;
+            lastNudgeAt = now;
+          }
+          hunt.timer = setTimeout(probe, PROBE_MS);
+          return;
+        }
+
+        // Nothing new for STALL_MS, so the whole history really is loaded.
+        // Either the list is virtualized, or this bookmark is stale.
+        phase = "sweep";
       }
+
+      // Last resort: widen the sweep around the saved position across the whole
+      // now-loaded conversation.
+      sweepProbes++;
+      if (sweepProbes > SWEEP_PROBES) return fail();
+      if (!seekTo(container, maxScroll, sweepProbes, SWEEP_PROBES, 0.5)) return fail();
+
+      hunt.timer = setTimeout(probe, PROBE_MS);
     };
 
-    retry();
+    probe();
     return true;
   }
 
@@ -344,10 +636,10 @@
     };
 
     if (resolve()) {
-      convergeScroll(resolve, desiredTop, highlightArrival);
+      arriveSmoothly(resolve, desiredTop, highlightArrival);
       return true;
     }
-    return renderThenResearch(stamp, resolve, desiredTop);
+    return huntForTarget(stamp, resolve, desiredTop);
   }
 
   // ============================================
@@ -537,12 +829,12 @@
     };
 
     if (resolve()) {
-      convergeScroll(resolve, desiredTop, highlightArrival);
+      arriveSmoothly(resolve, desiredTop, highlightArrival);
       return true;
     }
 
-    // Target not in the DOM yet — render it, then converge.
-    return renderThenResearch(stamp, resolve, desiredTop);
+    // Target not in the DOM yet — hunt until it renders, then converge.
+    return huntForTarget(stamp, resolve, desiredTop);
   }
 
   // ============================================
@@ -674,7 +966,17 @@
   // TOAST
   // ============================================
 
-  function showToast(message) {
+  function hideToast() {
+    const existing = document.getElementById("scrollstamp-toast");
+    if (!existing) return;
+    existing.classList.add("scrollstamp-toast-hide");
+    setTimeout(() => existing.remove(), 300);
+  }
+
+  // `options.persist` keeps the toast up until the caller clears it, which the
+  // hunt needs: it can run for a while, and a message that vanished after two
+  // seconds would leave the page looking frozen.
+  function showToast(message, options = {}) {
     const existing = document.getElementById("scrollstamp-toast");
     if (existing) existing.remove();
 
@@ -683,7 +985,11 @@
     toast.textContent = message;
     document.body.appendChild(toast);
 
+    if (options.persist) return;
+
     setTimeout(() => {
+      // A toast replaced in the meantime is already detached; leave the new one be.
+      if (!toast.isConnected) return;
       toast.classList.add("scrollstamp-toast-hide");
       setTimeout(() => toast.remove(), 300);
     }, 2000);
@@ -1043,6 +1349,10 @@
   // ============================================
 
   function handleScrollTo(stamp) {
+    // A second click supersedes the first rather than racing it for the scroll
+    // position. Note the return value now means "started", not "found" — a hunt
+    // may still be running when this returns.
+    cancelHunt("superseded");
     if (stamp.type === "selection") return scrollToSelection(stamp);
     if (stamp.type === "message") return scrollToMessage(stamp);
     return scrollToPosition(stamp);

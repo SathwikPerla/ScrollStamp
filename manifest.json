@@ -1,10 +1,16 @@
 {
   "manifest_version": 3,
   "name": "ScrollStamp",
-  "version": "2.3.0",
-  "description": "Smart bookmarking — select text on any page to save your place",
-  "permissions": ["storage", "activeTab", "scripting"],
-  "host_permissions": ["<all_urls>"],
+  "version": "2.3.2",
+  "description": "Save the exact spot you were reading and jump right back to it",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "icons": {
     "16": "icon.png",
     "48": "icon.png",
@@ -15,9 +21,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["content.css"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -32,8 +44,13 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["icon.png", "icons/*"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "icon.png",
+        "icons/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }
