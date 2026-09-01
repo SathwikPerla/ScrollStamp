@@ -505,11 +505,12 @@
   function huntForTarget(stamp, resolve, desiredTop) {
     cancelHunt("superseded");
 
-    const PROBE_MS = 300;
-    // Small on purpose. This only has to produce a real upward scroll event; at
-    // 300px the page visibly shook for the whole hunt, and at this size the
-    // jitter is not noticeable against content loading in above.
-    const NUDGE_PX = 24;
+    const PROBE_MS = 150;
+    // Tiny on purpose. This only has to produce a real upward scroll event —
+    // any change of a pixel or more fires one — and at 2px the alternation is
+    // invisible, where the earlier 24px read as the page twitching every round
+    // of a deep hunt.
+    const NUDGE_PX = 2;
     // Stalling is measured in TIME, not in probe count. A huge conversation on a
     // slow connection can take seconds to return one page of history, and a
     // count-based limit would read that pause as "the history is exhausted" and
@@ -519,14 +520,58 @@
     const FAST_SEEK_PROBES = 2;
     const FAST_SEEK_MS = 150;
     // Only nudge after loading has been quiet this long, so an arriving page is
-    // never interrupted and the view stays still while content streams in.
-    const QUIET_MS = 500;
+    // never interrupted. Kept short: on a deep bookmark this pause is paid once
+    // per page of history, so every extra 100ms here multiplies into visible
+    // seconds. The mutation observer below makes quiet detection prompt enough
+    // for a small value to be safe.
+    const QUIET_MS = 250;
     const SWEEP_PROBES = 20;      // wide sweep once growth has genuinely stopped
+    // A freshly-positioned view is held until the platform has rendered there
+    // AND that rendering has gone quiet — under a hard cap so an actively
+    // streaming reply cannot pin the hunt. Silence alone is NOT permission to
+    // move on: platforms debounce their rendering, so "no mutations yet" means
+    // the render may still be coming, and leaving early is exactly what made
+    // far-away bookmarks fail while manually scrolling near them worked.
+    const RENDER_QUIET_MS = 350;
+    const SEEK_RENDER_MAX_MS = 1500;
+    const SWEEP_RENDER_MAX_MS = 1200;
+    // Nudges are spaced wider than the progress-quiet window: a platform that
+    // waits for scroll-quiet before rendering must actually get some.
+    const NUDGE_SPACING_MS = 450;
+
+    // True once the region has rendered after `positionedAt` and settled; while
+    // false (and under the cap) the position must be held.
+    const renderSettled = (positionedAt, lastMutationAt) =>
+      lastMutationAt > positionedAt && Date.now() - lastMutationAt >= RENDER_QUIET_MS;
     const RUNAWAY_MS = 600000;    // 10 minutes, purely a guard against an endless loop
 
     const startedAt = Date.now();
-    const hunt = { timer: null, toastShown: false, detach: () => {} };
+    const hunt = { timer: null, toastShown: false, observer: null, detach: () => {} };
     activeHunt = hunt;
+
+    // React to arriving history the moment it renders instead of at the next
+    // poll tick. On a deep bookmark the hunt runs one round per page of
+    // history, so a polling delay per round multiplies into visible seconds;
+    // the observer collapses each of those waits to ~one frame. The 60ms
+    // coalesce keeps a streaming render from probing hundreds of times.
+    let observerScheduled = false;
+    let lastMutationAt = 0;
+    const onMutations = () => {
+      lastMutationAt = Date.now();
+      if (observerScheduled || activeHunt !== hunt) return;
+      observerScheduled = true;
+      setTimeout(() => {
+        observerScheduled = false;
+        if (activeHunt !== hunt) return;
+        clearTimeout(hunt.timer);
+        probe();
+      }, 60);
+    };
+    const observeContainer = (container) => {
+      if (hunt.observer) return;
+      hunt.observer = new MutationObserver(onMutations);
+      hunt.observer.observe(container, { childList: true, subtree: true });
+    };
 
     // The hunt moves the page on the user's behalf, so any real gesture hands
     // control straight back. Plain scroll events are deliberately not in this
@@ -540,6 +585,7 @@
       window.removeEventListener("wheel", onUserGesture, passiveCapture);
       window.removeEventListener("touchstart", onUserGesture, passiveCapture);
       window.removeEventListener("keydown", onUserGesture, true);
+      if (hunt.observer) hunt.observer.disconnect();
     };
 
     const settle = () => {
@@ -561,6 +607,14 @@
         hideToast();
         window.scrollTo({ top: stamp.scrollY, behavior: "smooth" });
         return;
+      }
+      // Park the view at the saved container position rather than wherever the
+      // sweep happened to stop — the right neighbourhood, even if the exact
+      // spot could not be pinned down.
+      const container = findMainScrollContainer();
+      if (container) {
+        const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+        seekTo(container, maxScroll, 1, 1, 0);
       }
       showToast("Couldn't find that bookmark on this page");
     };
@@ -585,7 +639,9 @@
 
     let phase = "seek";
     let seekProbes = 0;
+    let seekPositionedAt = 0;
     let sweepProbes = 0;
+    let sweepPositionedAt = 0;
     let tallest = -1;
     let mostMessages = -1;
     let nudged = false;
@@ -618,6 +674,7 @@
         announced = true;
         lastProgressAt = Date.now(); // the container appearing is progress
       }
+      observeContainer(container);
 
       const height = container.scrollHeight;
       const count = getAssistantMessages().length;
@@ -635,12 +692,27 @@
       // has failed — going there first is what made a nearby bookmark take
       // seconds, because it scrolled to the top and then waited out the stall.
       if (phase === "seek") {
-        seekProbes++;
-        if (seekProbes <= FAST_SEEK_PROBES && seekTo(container, maxScroll, seekProbes, FAST_SEEK_PROBES, 0.08)) {
-          hunt.timer = setTimeout(probe, FAST_SEEK_MS);
-          return;
+        if (seekProbes < FAST_SEEK_PROBES) {
+          seekProbes++;
+          if (seekTo(container, maxScroll, seekProbes, FAST_SEEK_PROBES, 0.08)) {
+            seekPositionedAt = Date.now();
+            hunt.timer = setTimeout(probe, FAST_SEEK_MS);
+            return;
+          }
+          phase = "grow"; // no saved anchor to seek toward
+        } else {
+          // Positioned near the saved spot — hold here until the platform has
+          // rendered that region and settled. Moving on the instant the
+          // positioning probes finished is what made far-away bookmarks fail
+          // intermittently: GROW yanked the view to the top, and a virtualized
+          // chat unmounted the target's region right as it was about to render.
+          if (!renderSettled(seekPositionedAt, lastMutationAt) &&
+              Date.now() - seekPositionedAt < SEEK_RENDER_MAX_MS) {
+            hunt.timer = setTimeout(probe, PROBE_MS);
+            return;
+          }
+          phase = "grow";
         }
-        phase = "grow";
       }
 
       if (phase === "grow") {
@@ -660,7 +732,7 @@
           // The alternation matters. Assigning the value scrollTop already holds
           // fires no scroll event at all, so a platform that paginates from a
           // scroll listener or a top sentinel would load one page and then stop.
-          if (now - lastProgressAt > QUIET_MS && now - lastNudgeAt > QUIET_MS) {
+          if (now - lastProgressAt > QUIET_MS && now - lastNudgeAt > NUDGE_SPACING_MS) {
             container.scrollTop = nudged ? 0 : Math.min(NUDGE_PX, container.scrollHeight);
             nudged = !nudged;
             lastNudgeAt = now;
@@ -675,10 +747,20 @@
       }
 
       // Last resort: widen the sweep around the saved position across the whole
-      // now-loaded conversation.
+      // conversation. Each position is held until rendering there goes quiet
+      // (capped), so a virtualized list gets a real chance to mount the target
+      // at every stop — this is also what finds a target that sits BELOW the
+      // current view, which GROW (upward by design) can never reach.
+      if (sweepPositionedAt &&
+          !renderSettled(sweepPositionedAt, lastMutationAt) &&
+          Date.now() - sweepPositionedAt < SWEEP_RENDER_MAX_MS) {
+        hunt.timer = setTimeout(probe, PROBE_MS);
+        return;
+      }
       sweepProbes++;
       if (sweepProbes > SWEEP_PROBES) return fail();
       if (!seekTo(container, maxScroll, sweepProbes, SWEEP_PROBES, 0.5)) return fail();
+      sweepPositionedAt = Date.now();
 
       hunt.timer = setTimeout(probe, PROBE_MS);
     };
