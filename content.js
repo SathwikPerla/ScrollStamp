@@ -214,9 +214,15 @@
   // gesture bumps it too: with a tight landing tolerance, a late correction
   // would otherwise yank the view back out of the user's hands.
   let arrivalToken = 0;
+  // The in-flight arrival's own cleanup, so a supersede can run it immediately
+  // instead of waiting on that arrival's own (now-dead) callbacks to notice —
+  // they check the token and return early without detaching, which is how a
+  // superseded arrival's gesture listeners kept accumulating on `window`.
+  let activeArrivalDetach = null;
 
   function cancelArrival() {
     arrivalToken++;
+    if (activeArrivalDetach) { activeArrivalDetach(); activeArrivalDetach = null; }
   }
 
   function arriveSmoothly(resolveTarget, desiredTop, onDone) {
@@ -243,9 +249,11 @@
     window.addEventListener("wheel", onUserGesture, passiveCapture);
     window.addEventListener("touchstart", onUserGesture, passiveCapture);
     window.addEventListener("keydown", onUserGesture, true);
+    activeArrivalDetach = detach;
 
     const finish = (t) => {
       detach();
+      if (activeArrivalDetach === detach) activeArrivalDetach = null;
       if (t && onDone) onDone(t);
     };
 
@@ -465,6 +473,17 @@
       if (hits.length) return remember(messages[pickNearest(hits, index)]);
     }
 
+    // Last resort: every tier above requires the anchor at the START of the
+    // message's preview. getMessagePreview reads through a text-selector
+    // (`.markdown` etc.); when that selector resolves differently between
+    // renders — a code block, table, or citation marker shifting what counts
+    // as the "start" — the leading text changes and every prefix tier misses
+    // even though the message is right there. Checking the FULL text for the
+    // anchor as a substring catches that case without weakening anything above.
+    hits = [];
+    messages.forEach((m, i) => { if ((m.textContent || "").includes(anchor)) hits.push(i); });
+    if (hits.length) return remember(messages[pickNearest(hits, index)]);
+
     return null;
   }
 
@@ -525,7 +544,6 @@
     // seconds. The mutation observer below makes quiet detection prompt enough
     // for a small value to be safe.
     const QUIET_MS = 250;
-    const SWEEP_PROBES = 20;      // wide sweep once growth has genuinely stopped
     // A freshly-positioned view is held until the platform has rendered there
     // AND that rendering has gone quiet — under a hard cap so an actively
     // streaming reply cannot pin the hunt. Silence alone is NOT permission to
@@ -540,9 +558,24 @@
     const NUDGE_SPACING_MS = 450;
 
     // True once the region has rendered after `positionedAt` and settled; while
-    // false (and under the cap) the position must be held.
-    const renderSettled = (positionedAt, lastMutationAt) =>
-      lastMutationAt > positionedAt && Date.now() - lastMutationAt >= RENDER_QUIET_MS;
+    // false (and under the cap) the position must be held. Requiring a
+    // mutation unconditionally was the bug: on a thread that is already fully
+    // mounted (not virtualized), repositioning the scroll produces NO
+    // mutations at all, so that requirement never became true and every stop
+    // burned its full cap — the "searches for a long time, then fails" case.
+    //
+    // The fix has to stay evidence-based rather than just shortening the wait,
+    // or it re-breaks a real debounced mount (confirmed by test: a mount
+    // arriving after ~350-700ms was being called "settled" before it rendered).
+    // `everMutated` is hunt-wide, not per-position: if GROW has already run its
+    // full stall window and NOTHING mutated anywhere on the page, this thread
+    // doesn't virtualize, and no position is worth a mutation-wait; if anything
+    // ever mutated, a debounced render is possible and the strict wait stands.
+    const renderSettled = (positionedAt, lastMutationAt, everMutated) => {
+      if (lastMutationAt > positionedAt) return Date.now() - lastMutationAt >= RENDER_QUIET_MS;
+      if (!everMutated && Date.now() - startedAt > STALL_MS) return Date.now() - positionedAt >= RENDER_QUIET_MS;
+      return false;
+    };
     const RUNAWAY_MS = 600000;    // 10 minutes, purely a guard against an endless loop
 
     const startedAt = Date.now();
@@ -556,8 +589,10 @@
     // coalesce keeps a streaming render from probing hundreds of times.
     let observerScheduled = false;
     let lastMutationAt = 0;
+    let everMutated = false;
     const onMutations = () => {
       lastMutationAt = Date.now();
+      everMutated = true;
       if (observerScheduled || activeHunt !== hunt) return;
       observerScheduled = true;
       setTimeout(() => {
@@ -642,6 +677,7 @@
     let seekPositionedAt = 0;
     let sweepProbes = 0;
     let sweepPositionedAt = 0;
+    let sweepPlan = null;
     let tallest = -1;
     let mostMessages = -1;
     let nudged = false;
@@ -706,7 +742,7 @@
           // positioning probes finished is what made far-away bookmarks fail
           // intermittently: GROW yanked the view to the top, and a virtualized
           // chat unmounted the target's region right as it was about to render.
-          if (!renderSettled(seekPositionedAt, lastMutationAt) &&
+          if (!renderSettled(seekPositionedAt, lastMutationAt, everMutated) &&
               Date.now() - seekPositionedAt < SEEK_RENDER_MAX_MS) {
             hunt.timer = setTimeout(probe, PROBE_MS);
             return;
@@ -752,14 +788,40 @@
       // at every stop — this is also what finds a target that sits BELOW the
       // current view, which GROW (upward by design) can never reach.
       if (sweepPositionedAt &&
-          !renderSettled(sweepPositionedAt, lastMutationAt) &&
+          !renderSettled(sweepPositionedAt, lastMutationAt, everMutated) &&
           Date.now() - sweepPositionedAt < SWEEP_RENDER_MAX_MS) {
         hunt.timer = setTimeout(probe, PROBE_MS);
         return;
       }
+      if (sweepPlan === null) {
+        // The saved ratio can be stale by more than its own error bar: captured
+        // against a partially-loaded page, it can point at the wrong HALF of the
+        // fully-loaded one, and a sweep confined to its neighbourhood then never
+        // reaches the target — the "couldn't find" bookmark that a fresh tab
+        // retrieves fine. So: a fine pass around the hint first, then a grid
+        // over the ENTIRE page, ordered nearest-the-hint first.
+        const hint = typeof stamp.containerScrollRatio === "number"
+          ? stamp.containerScrollRatio
+          : (typeof stamp.containerScrollY === "number" && maxScroll > 0
+              ? Math.min(1, stamp.containerScrollY / maxScroll)
+              : null);
+        if (hint === null) return fail();
+        sweepPlan = [];
+        const seen = new Set();
+        const push = (r) => {
+          r = Math.min(1, Math.max(0, r));
+          const key = Math.round(r * 40);
+          if (!seen.has(key)) { seen.add(key); sweepPlan.push(r); }
+        };
+        [0, -0.05, 0.05, -0.1, 0.1, -0.15, 0.15].forEach((d) => push(hint + d));
+        const grid = [];
+        for (let i = 0; i <= 20; i++) grid.push(i / 20);
+        grid.sort((a, b) => Math.abs(a - hint) - Math.abs(b - hint));
+        grid.forEach(push);
+      }
+      if (sweepProbes >= sweepPlan.length) return fail();
+      container.scrollTop = sweepPlan[sweepProbes] * maxScroll;
       sweepProbes++;
-      if (sweepProbes > SWEEP_PROBES) return fail();
-      if (!seekTo(container, maxScroll, sweepProbes, SWEEP_PROBES, 0.5)) return fail();
       sweepPositionedAt = Date.now();
 
       hunt.timer = setTimeout(probe, PROBE_MS);
@@ -818,12 +880,15 @@
     return scrollHeight <= 0 ? 0 : Math.round((scrollTop / scrollHeight) * 100);
   }
 
-  function createSelectionStamp(selectedText, contextBefore, messageEl, messageIndex) {
+  function createSelectionStamp(selectedText, contextBefore, messageEl, messageIndex, charOffset) {
     return {
       id: `sel_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
       type: "selection",
       selectedText,
       contextBefore,
+      // Where in the message (or page) the selection began, as a raw character
+      // offset — the tie-breaker when the same phrase occurs more than once.
+      charOffset,
       messageIndex,
       messagePreview: messageEl ? getMessagePreview(messageEl) : "",
       preview: selectedText.substring(0, 100).replace(/\s+/g, " "),
@@ -869,7 +934,26 @@
     return { normalized, map };
   }
 
-  function findTextRange(root, searchText, contextBefore) {
+  // Raw character offset of (node, offset) within root's concatenated text.
+  // Saved with a selection so a repeated phrase can be disambiguated by its
+  // POSITION, not just by the 40 chars of context before it — context is empty
+  // whenever the selection starts at the beginning of a text node.
+  function textOffsetWithin(root, node, offset) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let total = 0;
+    let n;
+    while ((n = walker.nextNode())) {
+      if (n === node) return total + offset;
+      total += n.textContent.length;
+    }
+    return -1;
+  }
+
+  // ALL occurrences are collected and the one nearest the saved in-root offset
+  // wins. Taking the first bare-text match is how a bookmark on a few common
+  // words landed on an earlier repetition of the same phrase instead of the
+  // spot the user actually selected.
+  function findBestTextRange(root, searchText, contextBefore, preferredOffset) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
     let fullText = "";
@@ -886,15 +970,30 @@
 
     if (!normSearch) return null;
 
-    let normStart = -1;
-    if (normContext) {
-      const ctxIdx = normalizedFullText.indexOf(normContext + normSearch);
-      if (ctxIdx >= 0) normStart = ctxIdx + normContext.length;
+    const collectStarts = (needle, shift) => {
+      const starts = [];
+      let idx = normalizedFullText.indexOf(needle);
+      while (idx >= 0 && starts.length < 50) {
+        starts.push(idx + shift);
+        idx = normalizedFullText.indexOf(needle, idx + 1);
+      }
+      return starts;
+    };
+
+    // Context-anchored occurrences are the stronger signal; bare-text ones are
+    // only considered when no context match exists at all.
+    let candidates = normContext ? collectStarts(normContext + normSearch, normContext.length) : [];
+    if (!candidates.length) candidates = collectStarts(normSearch, 0);
+    if (!candidates.length) return null;
+
+    let normStart = candidates[0];
+    if (typeof preferredOffset === "number" && preferredOffset >= 0 && candidates.length > 1) {
+      let bestDist = Infinity;
+      for (const c of candidates) {
+        const dist = Math.abs(fullToOriginalMap[c] - preferredOffset);
+        if (dist < bestDist) { bestDist = dist; normStart = c; }
+      }
     }
-    if (normStart < 0) {
-      normStart = normalizedFullText.indexOf(normSearch);
-    }
-    if (normStart < 0) return null;
 
     const normEnd = normStart + normSearch.length;
     const textStart = fullToOriginalMap[normStart];
@@ -965,9 +1064,16 @@
     // the whole message. Re-finding (not caching a rect) is what lets the
     // converger track the target as lazy content reflows the page.
     const resolve = () => {
-      const messageEl = isAIChat ? findMessageElement(stamp.messagePreview, stamp.messageIndex) : null;
+      const hasMessageAnchor = isAIChat && stamp.messagePreview;
+      const messageEl = hasMessageAnchor ? findMessageElement(stamp.messagePreview, stamp.messageIndex) : null;
+      // The bookmark names a specific message. Falling back to a page-wide text
+      // search when that message isn't resolvable is how a selection of a few
+      // common words landed on an earlier repetition of the same text in a
+      // different message — return null instead, and let the hunt keep going
+      // until the RIGHT message is mounted.
+      if (hasMessageAnchor && !messageEl) return null;
       const searchRoot = messageEl || document.body;
-      const range = findTextRange(searchRoot, stamp.selectedText, stamp.contextBefore || "");
+      const range = findBestTextRange(searchRoot, stamp.selectedText, stamp.contextBefore || "", stamp.charOffset);
       if (range) {
         return {
           rect: range.getBoundingClientRect(),
@@ -1385,7 +1491,9 @@
         }
       }
 
-      const stamp = createSelectionStamp(selectedText, contextBefore, messageEl, messageIndex);
+      const offsetRoot = messageEl || document.body;
+      const charOffset = textOffsetWithin(offsetRoot, range.startContainer, range.startOffset);
+      const stamp = createSelectionStamp(selectedText, contextBefore, messageEl, messageIndex, charOffset);
       const anchorRect = range.getBoundingClientRect();
 
       hideSelectionButton();
